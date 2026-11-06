@@ -3,6 +3,7 @@ module github.com/chenbenja/daywire
 go 1.26.0
 
 require (
+	github.com/k2-fsa/sherpa-onnx-go/v2 v2.0.1
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.14.0
@@ -13,6 +14,9 @@ require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/k2-fsa/sherpa-onnx-go-linux/v2 v2.0.1 // indirect
+	github.com/k2-fsa/sherpa-onnx-go-macos/v2 v2.0.1 // indirect
+	github.com/k2-fsa/sherpa-onnx-go-windows/v2 v2.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect

@@ -184,6 +184,8 @@ func (s *Store) InsertEvent(ctx context.Context, ev event.Event) error {
 	if err := ev.Validate(); err != nil {
 		return err
 	}
+	// Columns sealed here and on nudges are summary, title, and message.
+	// Speaker profiles use speaker.embedding so the AADs stay distinct.
 	nonce, ct, err := s.box.Seal(crypt.AAD(ev.ID, "summary"), []byte(ev.Summary))
 	if err != nil {
 		return fmt.Errorf("seal event %s: %w", ev.ID, err)

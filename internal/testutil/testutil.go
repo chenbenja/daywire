@@ -40,6 +40,7 @@ func ClearEnv(t *testing.T) {
 		"DAYWIRE_DATA_KEY",
 		"DAYWIRE_DATA_KEY_FILE",
 		"DAYWIRE_LOG_LEVEL",
+		"DAYWIRE_SPEAKER_MODEL_DIR",
 		"XDG_CONFIG_HOME",
 	} {
 		t.Setenv(key, "")

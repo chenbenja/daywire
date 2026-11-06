@@ -4,7 +4,7 @@
 
 Daywire is an open-source, phone-first life-context bridge. It turns the day into redacted semantic events and hands those events to the assistant you already use.
 
-**Status:** Week 1 localhost Go core. The process binds to loopback, stores redacted events in SQLite, and speaks MCP. Phone capture, on-device speech-to-text, and speaker identification are later weeks.
+**Status:** Week 1 localhost Go core. The process binds to loopback, stores redacted events in SQLite, and speaks MCP. Phone capture and on-device speech-to-text are later weeks. A laptop speaker-identification spike (`./hack/make.sh speaker`) enrolls a voice locally and labels that cluster `owner`. It does not send audio to assistants. Phone speaker models are still later.
 
 **License:** TBD
 
@@ -21,7 +21,18 @@ The `daywire` binary:
 
 Assistants receive the redacted summary. There is no audio field and no upload route.
 
-What is intentionally absent is listed in [docs/poc-week1.md](docs/poc-week1.md).
+What is intentionally absent is listed in [docs/poc-week1.md](docs/poc-week1.md). The laptop speaker spike is [docs/speaker-spike.md](docs/speaker-spike.md).
+
+## Speaker spike
+
+`daywire speaker` on the Week 1 binary (`./hack/make.sh all`, `CGO_ENABLED=0`) reports that the engine is unavailable. The enroll-then-label check is a separate build so `serve` does not link sherpa:
+
+```bash
+./hack/make.sh speaker
+./output/daywire-speaker speaker demo --data-dir /tmp/daywire-speaker
+```
+
+That build downloads the pinned models into `output/speaker-models/` (gitignored) and logs `label=owner` on the matching LibriSpeech reader. It is not the MCP server. Details are in [docs/speaker-spike.md](docs/speaker-spike.md).
 
 ## Build
 
@@ -31,7 +42,7 @@ Requires Go 1.26 (the `go` directive in `go.mod`; the toolchain downloads it whe
 ./hack/make.sh all
 ```
 
-That runs `gofmt -l`, `go vet`, `go test -race ./...`, and writes `output/daywire`. The Makefile calls the same script: `make all`, `make test`, `make build`.
+That runs `gofmt -l`, `go vet`, `go test -race ./...`, and writes `output/daywire` with `CGO_ENABLED=0`. The Makefile calls the same script: `make all`, `make test`, `make build`. `./hack/make.sh speaker` is the opt-in sherpa build (`output/daywire-speaker`).
 
 ## Run
 
@@ -105,6 +116,7 @@ Tools:
 | `DAYWIRE_NTFY_URL` | Full ntfy topic URL. Unset means log the nudge. |
 | `DAYWIRE_NTFY_TOKEN` | Optional bearer token for ntfy. |
 | `DAYWIRE_LOG_LEVEL` | `debug`, `info`, `warn`, or `error`. |
+| `DAYWIRE_SPEAKER_MODEL_DIR` | Cache for the laptop speaker-id models. Default `output/speaker-models` inside a checkout, otherwise `$XDG_CACHE_HOME/daywire/speaker`. |
 
 If neither key variable is set, the first command creates `<data dir>/data.key` with mode `0600` and reuses it. Flags `--addr` and `--data-dir` override the matching variables. The key and the ntfy token are environment-only so they do not appear in the process list.
 
@@ -115,6 +127,7 @@ The database is [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) (pur
 ## Docs
 
 - [Week 1 POC notes](docs/poc-week1.md)
+- [Laptop speaker-id spike](docs/speaker-spike.md)
 - [Concept report (v5)](docs/research/daywire-concept-report.md)
 - [Research notes](docs/research/notes/)
 

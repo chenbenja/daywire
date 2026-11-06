@@ -38,17 +38,24 @@ test)
 	;;
 build)
 	mkdir -p output
-	go build -o output/daywire ./cmd/daywire
+	CGO_ENABLED=0 go build -o output/daywire ./cmd/daywire
+	;;
+speaker)
+	fmt_check
+	go vet -tags speaker ./...
+	go test -count=1 -race -tags speaker ./internal/speaker/ ./internal/cli/
+	mkdir -p output
+	go build -tags speaker -o output/daywire-speaker ./cmd/daywire
 	;;
 all)
 	fmt_check
 	go vet ./...
 	go test -count=1 -race ./...
 	mkdir -p output
-	go build -o output/daywire ./cmd/daywire
+	CGO_ENABLED=0 go build -o output/daywire ./cmd/daywire
 	;;
 *)
-	echo "usage: $0 {fmt|fmt-write|vet|test|build|all}" >&2
+	echo "usage: $0 {fmt|fmt-write|vet|test|build|speaker|all}" >&2
 	exit 2
 	;;
 esac
