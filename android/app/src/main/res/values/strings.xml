@@ -6,8 +6,9 @@
     <string name="action_failed">That did not work.</string>
 
     <string name="section_store">Store</string>
-    <string name="store_help">The encrypted event database is in this app\'s private storage. This screen does not open a network port.</string>
+    <string name="store_help">Summaries and nudge text are encrypted with AES-256-GCM. Identifiers, types, times, and source names stay readable. The key is a file in this app\'s private storage, not the Android keystore. This screen does not open a network port.</string>
     <string name="store_open">Store is open on this phone.</string>
+    <string name="store_opening">Opening the store on this phone.</string>
     <string name="store_closed">Store did not open: %1$s</string>
 
     <string name="section_notifications">Notifications</string>
@@ -35,6 +36,7 @@
     <string name="location_permission_denied">Approximate location was not granted, so no visit was stored.</string>
     <string name="location_off">Location is turned off in system settings, so no visit was stored.</string>
     <string name="location_missing">No approximate location yet, so no visit was stored.</string>
+    <string name="location_timeout">No approximate location arrived in time, so no visit was stored.</string>
     <string name="location_stored">Coarse visit stored.</string>
 
     <string name="section_folder">Folder</string>
@@ -45,6 +47,7 @@
     <string name="folder_empty">The folder has nothing at the top level.</string>
     <string name="folder_capped">Showing the first 200 names.</string>
     <string name="folder_picked">Folder picked. Names only.</string>
+    <string name="folder_not_persistent">That folder cannot be kept. Nothing was saved and no file was opened.</string>
     <string name="folder_forgotten">Folder forgotten. The files were not deleted.</string>
     <string name="folder_unavailable">That folder is no longer readable.</string>
 
@@ -52,7 +55,7 @@
     <string name="nudge_help">Shows a notification from this app and records it in the store. ntfy is not used.</string>
     <string name="show_nudge">Show a sample nudge</string>
     <string name="nudge_shown">Sample nudge shown on this phone.</string>
-    <string name="nudge_not_shown">Notifications are off, so the nudge was recorded as not shown.</string>
+    <string name="nudge_not_shown">Notifications are off for Daywire, so the nudge was recorded as not shown.</string>
     <string name="nudge_permission_denied">Notification permission was not granted. The nudge was recorded as not shown.</string>
 
     <string name="section_events">Recent events</string>

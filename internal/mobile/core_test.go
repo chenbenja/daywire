@@ -277,6 +277,7 @@ func TestCoreDoesNotCallNtfy(t *testing.T) {
 	body, err := os.ReadFile("core.go")
 	require.NoError(t, err)
 	src := string(body)
+	require.NotContains(t, src, "internal/nudge")
 	require.NotContains(t, src, "nudge.New")
 	require.NotContains(t, src, ".Deliver(")
 	require.NotContains(t, src, "net/http")

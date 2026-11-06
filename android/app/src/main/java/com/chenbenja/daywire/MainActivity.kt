@@ -1,7 +1,6 @@
 package com.chenbenja.daywire
 
 import android.Manifest
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -9,6 +8,7 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.chenbenja.daywire.databinding.ActivityMainBinding
 import java.time.Instant
@@ -55,8 +55,13 @@ class MainActivity : AppCompatActivity() {
         if (uri == null) {
             return@registerForActivityResult
         }
-        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        FolderStore.save(this, uri)
+        try {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (error: SecurityException) {
+            setStatus(getString(R.string.folder_not_persistent))
+            return@registerForActivityResult
+        }
+        FolderStore.replace(this, uri)
         refreshFolder()
         setStatus(getString(R.string.folder_picked))
     }
@@ -86,7 +91,13 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshChrome()
-        refreshEvents()
+        DaywireCore.whenReady(this) {
+            if (isDestroyed) {
+                return@whenReady
+            }
+            refreshChrome()
+            refreshEvents()
+        }
     }
 
     private fun onVisit() {
@@ -102,9 +113,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun captureVisit() {
-        CoarseVisit.capture(this) { status ->
-            setStatus(status)
-            refreshEvents()
+        val host = java.lang.ref.WeakReference(this)
+        CoarseVisit.capture(this, alive = { host.get()?.isDestroyed == false }) { status ->
+            val activity = host.get() ?: return@capture
+            if (activity.isDestroyed) {
+                return@capture
+            }
+            activity.setStatus(status)
+            activity.refreshEvents()
         }
     }
 
@@ -169,11 +185,11 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.allow_count, allowed.size)
         }
         val openError = (application as DaywireApp).openError
-        val ready = openError == null
-        binding.textStore.text = if (ready) {
-            getString(R.string.store_open)
-        } else {
-            getString(R.string.store_closed, openError)
+        val ready = DaywireCore.isOpen()
+        binding.textStore.text = when {
+            openError != null -> getString(R.string.store_closed, openError)
+            ready -> getString(R.string.store_open)
+            else -> getString(R.string.store_opening)
         }
         binding.buttonVisit.isEnabled = ready
         binding.buttonNudge.isEnabled = ready
@@ -183,12 +199,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun listenerEnabled(): Boolean {
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-            ?: return false
-        val mine = ComponentName(this, DaywireNotificationListener::class.java)
-        return flat.split(":").any { part ->
-            ComponentName.unflattenFromString(part) == mine
-        }
+        return NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
     }
 
     private fun refreshFolder() {
@@ -201,7 +212,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.textFolder.text = getString(R.string.folder_picked)
         Thread {
-            val names = try {
+            val listing = try {
                 FolderStore.listNames(this, uri)
             } catch (error: Exception) {
                 null
@@ -211,10 +222,10 @@ class MainActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
                 binding.textFiles.text = when {
-                    names == null -> getString(R.string.folder_unavailable)
-                    names.isEmpty() -> getString(R.string.folder_empty)
-                    names.size >= 200 -> names.joinToString("\n") + "\n" + getString(R.string.folder_capped)
-                    else -> names.joinToString("\n")
+                    listing == null -> getString(R.string.folder_unavailable)
+                    listing.names.isEmpty() -> getString(R.string.folder_empty)
+                    listing.capped -> listing.names.joinToString("\n") + "\n" + getString(R.string.folder_capped)
+                    else -> listing.names.joinToString("\n")
                 }
             }
         }.start()

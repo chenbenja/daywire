@@ -16,13 +16,12 @@ fi
 export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
 
 gopath=$(go env GOPATH)
-export PATH="${gopath}/bin:${PATH}"
-
-if ! command -v gomobile >/dev/null 2>&1; then
-	# Versions come from go.mod (the gobind tool line). Do not float to @latest.
-	go install golang.org/x/mobile/cmd/gomobile
-	go install golang.org/x/mobile/cmd/gobind
-fi
+# Install the module's gomobile and gobind into a local bin so a stale
+# copy earlier on PATH cannot win. Versions come from go.mod.
+bindbin="${root}/output/android-bind-bin"
+mkdir -p "${bindbin}"
+GOBIN="${bindbin}" go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+export PATH="${bindbin}:${gopath}/bin:${PATH}"
 
 if [[ ! -d "${ANDROID_HOME}/ndk" && ! -d "${ANDROID_HOME}/ndk-bundle" && -z "${ANDROID_NDK_HOME:-}" ]]; then
 	echo "No Android NDK found under ANDROID_HOME. In Android Studio's SDK manager, install NDK (Side by side). The current plugin default is 28.2.13676358." >&2
@@ -40,6 +39,7 @@ if [[ ! -x "${realgo}" ]]; then
 	exit 1
 fi
 wrap=$(mktemp -d)
+trap 'rm -rf "${wrap}"' EXIT
 cat > "${wrap}/go" << EOF
 #!/bin/sh
 export GOTOOLCHAIN=local
@@ -63,7 +63,15 @@ gomobile bind \
 	-o "$out" \
 	github.com/chenbenja/daywire/mobile
 
-if unzip -l "$out" | grep -Ei 'sherpa|onnxruntime|libonnx'; then
+if ! command -v unzip >/dev/null 2>&1; then
+	echo "unzip is required to check the archive for speech libraries" >&2
+	exit 1
+fi
+listing=$(unzip -l "$out") || {
+	echo "could not list ${out}" >&2
+	exit 1
+}
+if printf '%s\n' "${listing}" | grep -Ei 'sherpa|onnxruntime|libonnx'; then
 	echo "bind output contains a speech library" >&2
 	exit 1
 fi

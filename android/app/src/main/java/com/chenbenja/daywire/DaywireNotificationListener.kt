@@ -10,6 +10,7 @@ import android.service.notification.StatusBarNotification
  *
  * The platform category constant is passed through. The title and the text
  * are not read: this class does not touch the notification extras.
+ * The store write is queued and does not block this callback.
  */
 class DaywireNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -30,13 +31,8 @@ class DaywireNotificationListener : NotificationListenerService() {
         val label = applicationLabel(packageManager, pkg)
         val category = sbn.notification?.category ?: ""
         val posted = sbn.postTime
-        try {
-            val id = DaywireCore.call(this) { core ->
-                core.insertNotification(pkg, label, category, posted)
-            }
-            Trace.info("notification stored id=$id package=$pkg")
-        } catch (error: Exception) {
-            Trace.info("notification not stored package=$pkg")
+        DaywireCore.submit(this) { core ->
+            core.insertNotification(pkg, label, category, posted)
         }
     }
 

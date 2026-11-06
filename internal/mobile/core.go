@@ -11,7 +11,7 @@ import (
 
 	"github.com/chenbenja/daywire/internal/config"
 	"github.com/chenbenja/daywire/internal/event"
-	"github.com/chenbenja/daywire/internal/nudge"
+	"github.com/chenbenja/daywire/internal/proposal"
 	"github.com/chenbenja/daywire/internal/store"
 )
 
@@ -30,10 +30,11 @@ type Core struct {
 	log   *slog.Logger
 }
 
-// Open opens or creates the encrypted store under dataDir. The directory is
+// Open opens or creates the store under dataDir. Summaries and nudge text are
+// AES-256-GCM; identifiers, types, and times stay plaintext. The directory is
 // created at mode 0700 and the key file follows the Week 1 rules. An empty
 // directory is refused so a missing Android path cannot fall through to the
-// laptop default.
+// laptop default. The key file is not wrapped in the Android Keystore.
 func Open(dataDir string) (*Core, error) {
 	return OpenWithLogger(dataDir, newLogger())
 }
@@ -94,7 +95,9 @@ func (c *Core) Checkpoint() error {
 }
 
 // InsertRedactedNote stores a note whose summary the caller has already
-// redacted. The Android shell uses it for a fixed synthetic check string.
+// redacted. The Android shell may call it only with the fixed synthetic
+// sentence. Notification capture must use InsertNotification, which does not
+// take a title or a body.
 func (c *Core) InsertRedactedNote(sourceID, summary string, occurredUnixMilli int64) (string, error) {
 	if err := c.ready(); err != nil {
 		return "", err
@@ -187,8 +190,8 @@ func (c *Core) RecordLocalNudge(title, message string, delivered bool) (string, 
 	if err := c.ready(); err != nil {
 		return "", err
 	}
-	proposal := nudge.Proposal{Title: strings.TrimSpace(title), Message: strings.TrimSpace(message)}
-	if err := proposal.Validate(); err != nil {
+	text := proposal.Proposal{Title: strings.TrimSpace(title), Message: strings.TrimSpace(message)}
+	if err := text.Validate(); err != nil {
 		return "", err
 	}
 	id, err := event.NewID()
@@ -206,8 +209,8 @@ func (c *Core) RecordLocalNudge(title, message string, delivered bool) (string, 
 			Channel:   store.ChannelLocal,
 			Delivered: delivered,
 			Detail:    detail,
-			Title:     proposal.Title,
-			Message:   proposal.Message,
+			Title:     text.Title,
+			Message:   text.Message,
 		})
 	})
 	if err != nil {

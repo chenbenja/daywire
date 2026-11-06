@@ -52,12 +52,15 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation(files("libs/daywire.aar"))
+    testImplementation("junit:junit:4.13.2")
 }
 
+val daywireAar = layout.projectDirectory.file("libs/daywire.aar")
+
 tasks.register("requireGoAar") {
+    val aarFile = daywireAar.asFile
     doFirst {
-        val aar = file("libs/daywire.aar")
-        if (!aar.exists()) {
+        if (!aarFile.isFile) {
             throw GradleException(
                 "Missing app/libs/daywire.aar. From the repository root run: ./hack/android-bind.sh",
             )

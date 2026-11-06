@@ -11,23 +11,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/chenbenja/daywire/internal/event"
+	"github.com/chenbenja/daywire/internal/proposal"
 )
 
-const (
-	maxTitleRunes   = 120
-	maxMessageRunes = 512
-)
-
-// Proposal is a redacted nudge. It is not a tool call and it never contains
-// call audio.
-type Proposal struct {
-	Title    string
-	Message  string
-	Priority int
-}
+// Proposal is a redacted nudge. Validation lives in internal/proposal so the
+// phone bind can check text without importing this package's ntfy client.
+type Proposal = proposal.Proposal
 
 // Result is the delivery status returned to the caller.
 type Result struct {
@@ -35,26 +26,6 @@ type Result struct {
 	Channel   string
 	Delivered bool
 	Detail    string
-}
-
-// Validate checks the proposal. Errors do not quote the title or message.
-func (p Proposal) Validate() error {
-	if strings.TrimSpace(p.Title) == "" {
-		return fmt.Errorf("nudge title is empty")
-	}
-	if !validHeaderValue(p.Title) || utf8.RuneCountInString(p.Title) > maxTitleRunes {
-		return fmt.Errorf("nudge title is invalid")
-	}
-	if strings.TrimSpace(p.Message) == "" {
-		return fmt.Errorf("nudge message is empty")
-	}
-	if strings.ContainsRune(p.Message, 0) || !utf8.ValidString(p.Message) || utf8.RuneCountInString(p.Message) > maxMessageRunes {
-		return fmt.Errorf("nudge message is invalid")
-	}
-	if p.Priority < 0 || p.Priority > 5 {
-		return fmt.Errorf("nudge priority must be 0..5")
-	}
-	return nil
 }
 
 // Sender posts nudges to a ntfy topic, or logs them when URL is empty.
@@ -132,16 +103,4 @@ func (s *Sender) Deliver(ctx context.Context, p Proposal) (Result, error) {
 	}
 	s.log.InfoContext(ctx, "nudge posted", "nudge_id", id, "channel", "ntfy")
 	return Result{ID: id, Channel: "ntfy", Delivered: true, Detail: "posted"}, nil
-}
-
-func validHeaderValue(s string) bool {
-	if strings.TrimSpace(s) == "" || strings.ContainsAny(s, "\r\n") {
-		return false
-	}
-	for _, r := range s {
-		if r < 0x20 || r == 0x7f {
-			return false
-		}
-	}
-	return utf8.ValidString(s)
 }

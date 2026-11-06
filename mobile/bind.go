@@ -7,8 +7,9 @@ type Core struct {
 	inner *mobile.Core
 }
 
-// Open opens or creates the encrypted store at dataDir. It does not listen
-// on a socket and it does not contact ntfy.
+// Open opens or creates the store at dataDir. Summaries and nudge text are
+// encrypted; the database file is not. It does not listen on a socket and it
+// does not contact ntfy.
 func Open(dataDir string) (*Core, error) {
 	inner, err := mobile.Open(dataDir)
 	if err != nil {
@@ -27,7 +28,9 @@ func (c *Core) Close() error {
 	return err
 }
 
-// InsertRedactedNote stores a note. summary must already be redacted.
+// InsertRedactedNote stores a note. summary must already be redacted. The
+// Android UI may pass only the fixed synthetic sentence. Notification capture
+// uses InsertNotification.
 func (c *Core) InsertRedactedNote(sourceID, summary string, occurredUnixMilli int64) (string, error) {
 	if err := c.ready(); err != nil {
 		return "", err

@@ -11,7 +11,7 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 ## Layout
 
 - `cmd/daywire/` is a thin `main`. Flag parsing and subcommands live in `internal/cli`.
-- Product code lives under `internal/`. One concern per package: `event`, `crypt`, `config`, `store`, `nudge`, `seed`, `service`, `server`, `doctor`, `speaker`, `mobile`. `speaker` is the laptop enroll-then-owner spike. The sherpa engine is behind the `speaker` build tag, so the default `daywire` binary stays pure Go. The spike does not add an event field or a network bind. `internal/mobile` is the on-device store API. `mobile/` is the gomobile bind surface, because the generated JNI wrapper cannot import an `internal` package.
+- Product code lives under `internal/`. One concern per package: `event`, `crypt`, `config`, `store`, `proposal`, `nudge`, `seed`, `service`, `server`, `doctor`, `speaker`, `mobile`. `proposal` checks nudge text and does not import a network client. `speaker` is the laptop enroll-then-owner spike. The sherpa engine is behind the `speaker` build tag, so the default `daywire` binary stays pure Go. The spike does not add an event field or a network bind. `internal/mobile` is the on-device store API. `mobile/` is the gomobile bind surface, because the generated JNI wrapper cannot import an `internal` package.
 - `android/` is the Week 2 Kotlin shell. `./hack/make.sh all` does not build it. `./hack/android-bind.sh` writes `android/app/libs/daywire.aar` and must not pass `-tags speaker`.
 - `hack/make.sh` is the build entry. The Makefile only calls it.
 - Binaries go to `output/`. Do not commit `output/`.

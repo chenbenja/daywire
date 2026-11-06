@@ -2,7 +2,7 @@
 
 **Status:** thin Kotlin shell over the Week 1 Go store, November 2026.
 
-Week 2 is an app Chen can open in Android Studio. The encrypted event store runs on the phone. The laptop MCP server is not in the APK, and the phone does not listen on a port. ntfy stays the laptop fallback. It is not used here, and the app does not request the internet permission.
+Week 2 is an app Chen can open in Android Studio. The Week 1 store runs on the phone: summaries and nudge text are AES-256-GCM, and identifiers, types, times, and source ids stay plaintext. The database file is not whole-file encryption. The laptop MCP server is not in the APK, and the phone does not listen on a port. ntfy stays the laptop fallback. It is not used here, and the app does not request the internet permission.
 
 Speech-to-text, speaker identification, and call audio are not this slice. The folder picker is only a capture hook for a later week.
 
@@ -10,7 +10,7 @@ Speech-to-text, speaker identification, and call audio are not this slice. The f
 
 | Piece | Where | Behavior |
 |---|---|---|
-| On-device store API | `internal/mobile` | Opens the Week 1 SQLite store (AES-256-GCM summaries). No socket. Tested with `go test`. |
+| On-device store API | `internal/mobile` | Opens the Week 1 SQLite store. Summaries and nudge text are AES-256-GCM. No socket. Tested with `go test`. |
 | gomobile surface | `mobile/` | Thin wrapper the Android build binds. It exists so the generated JNI code, which lives outside this module, can import the API. `internal/` packages cannot be imported from there. |
 | Bind script | `hack/android-bind.sh` | `gomobile bind` for `android/arm64` and `android/amd64`. Does not pass `-tags speaker`. |
 | App | `android/` | One screen: store status, notification access, allow-list, one coarse visit, folder names, a sample nudge, recent events. |
@@ -36,7 +36,9 @@ Group-summary notifications are skipped, and so are notifications posted by Dayw
 
 Visit events are type `visit`, source `android:location`. Latitude and longitude are rounded to two decimal degrees (about 1.1 km) and the summary is `Visit: coarse grid 32.08,34.78`. The raw fix is not stored and is not written to logcat. The grid is the redacted summary, so it does show on the Recent events list.
 
-A button inserts one fixed synthetic note (`android:synthetic`) so the store can be checked without personal data.
+A button inserts one fixed synthetic note (`android:synthetic`) so the store can be checked without personal data. `InsertRedactedNote` will store the summary it is given, so the shell may call it only with that fixed sentence. The notification listener does not call it.
+
+Notification source ids are `android:notification:<package>` in the clear, so which allowed apps notified, and when, can be read without the key. The package name inside the summary is ciphertext. Hashing the source id, and wrapping `data.key` in the Android Keystore, are not done in this slice.
 
 Local nudges use store channel `local`, detail `shown` or `not shown`. Title and message are encrypted like Week 1. The log line records the id and whether it was shown, not the text.
 
@@ -87,11 +89,11 @@ cd android
 
 The debug APK is `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-Checked while landing this slice: `./hack/make.sh all` passes; `./hack/android-bind.sh` writes an AAR whose native libraries are `arm64-v8a` and `x86_64` and which does not contain sherpa or onnxruntime; `./gradlew :app:assembleDebug` succeeds against SDK platform 36, build-tools 36.0.0, and NDK 28.2.13676358. The resulting APK requests notification-post and approximate-location only. It does not request the internet permission. An emulator was not started, so the buttons were not clicked through on a device.
+Checked on this branch: `./hack/make.sh all` passes; `./hack/android-bind.sh` writes an AAR whose native libraries are `arm64-v8a` and `x86_64` and which does not contain sherpa or onnxruntime; `./gradlew :app:testDebugUnitTest :app:assembleDebug` succeeds against SDK platform 36, build-tools 36.0.0, and NDK 28.2.13676358. The resulting APK requests notification-post and approximate-location only. It does not request the internet permission. An emulator was not started, so the buttons were not clicked through on a device.
 
 ## On a phone
 
-Install the debug build and open Daywire. The store line should say the store is open. Events live in the app's private no-backup directory (`no_backup/store/events.db` and `data.key` inside the app sandbox). Backup to the cloud is off. The key rules match Week 1: a generated 32-byte AES key in `data.key` unless `DAYWIRE_DATA_KEY` or `DAYWIRE_DATA_KEY_FILE` is set, which they are not on a phone.
+Install the debug build and open Daywire. The store line should say the store is open once the background open finishes. Events live in the app's private no-backup directory (`no_backup/store/events.db` and `data.key` inside the app sandbox). Backup to the cloud is off. `data.key` is a raw 32-byte key file next to the database, protected by the app sandbox and file-based encryption. It is not wrapped in the Android Keystore. The key rules otherwise match Week 1: the file is generated unless `DAYWIRE_DATA_KEY` or `DAYWIRE_DATA_KEY_FILE` is set, which they are not on a phone.
 
 ### Notification access
 
@@ -100,7 +102,7 @@ Install the debug build and open Daywire. The store line should say the store is
 3. On Android 13 and newer, a sideloaded app sometimes shows the toggle greyed out. Open the Daywire app info, use the menu, choose **Allow restricted settings**, go back to notification access, and enable it.
 4. Return to Daywire. It should say notification access is on, and **Allowed apps: none.**
 5. Tap **Choose allowed apps**. Check only the apps you want. Save. Until you do, posted notifications are ignored.
-6. Post a notification from an allowed app. Pull to refresh, or leave and reopen Daywire. A `note` appears. It names the app. It does not quote the notification.
+6. Post a notification from an allowed app. Tap **Refresh**, or leave and reopen Daywire. A `note` appears. It names the app. It does not quote the notification.
 
 ### Location
 
@@ -112,7 +114,7 @@ Install the debug build and open Daywire. The store line should say the store is
 ### Folder
 
 1. Tap **Pick a folder** and choose the directory in the system picker.
-2. Daywire lists top-level names. Directories are shown with a trailing slash. The list stops at 200 names and does not open files.
+2. Daywire lists top-level names, in alphabetical order. Directories are shown with a trailing slash. More than 200 names are shortened to the first 200 after sorting. A folder with exactly 200 names is not marked as shortened. Names are shown on screen and are not stored, logged, or opened.
 3. **Forget folder** drops the permission. It does not delete the files.
 
 ### Nudge

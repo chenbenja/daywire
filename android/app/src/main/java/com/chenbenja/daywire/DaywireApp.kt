@@ -9,10 +9,6 @@ class DaywireApp : Application() {
     override fun onCreate() {
         super.onCreate()
         LocalNudge.ensureChannel(this)
-        try {
-            DaywireCore.open(this)
-        } catch (error: Exception) {
-            Trace.info("store open failed")
-        }
+        DaywireCore.warm(this)
     }
 }

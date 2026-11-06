@@ -29,6 +29,8 @@ func TestMobileDepsExcludeSpeechAndServer(t *testing.T) {
 				require.NotContains(t, dep, "internal/speaker")
 				require.NotContains(t, dep, "internal/server")
 				require.NotContains(t, dep, "internal/cli")
+				require.NotContains(t, dep, "internal/nudge")
+				require.NotContains(t, dep, "net/http")
 			}
 		})
 	}

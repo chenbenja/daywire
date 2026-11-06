@@ -3,6 +3,19 @@ package com.chenbenja.daywire
 import android.content.Context
 
 /**
+ * Save stays disabled until the app list has loaded, so an early tap cannot
+ * replace a saved allow-list with an empty one.
+ */
+internal class AllowListGate {
+    var saveEnabled: Boolean = false
+        private set
+
+    fun onLoaded() {
+        saveEnabled = true
+    }
+}
+
+/**
  * Package names the user has allowed. Empty until they save a choice.
  * Names are not notification text, so they stay in app preferences.
  */

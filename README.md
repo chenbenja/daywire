@@ -36,7 +36,7 @@ That build downloads the pinned models into `output/speaker-models/` (gitignored
 
 ## Week 2 Android shell
 
-`android/` is a project Android Studio can open. It keeps the encrypted store on the phone, asks before reading notifications or location, lists a folder you pick, and shows nudges with the phone's own notifications. ntfy is not used on the phone. Speech models are not in the app.
+`android/` is a project Android Studio can open. Summaries and nudge text are AES-256-GCM on the phone; identifiers, types, times, and source names stay readable, and the database file is not encrypted as a whole. The key is a file in app-private storage, not the Android Keystore. The app asks before reading notifications or location, lists a folder you pick, and shows nudges with the phone's own notifications. ntfy is not used on the phone. Speech models are not in the app.
 
 Open the project only after the Go archive exists:
 

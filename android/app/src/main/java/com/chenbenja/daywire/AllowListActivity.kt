@@ -19,6 +19,7 @@ import com.chenbenja.daywire.databinding.ItemAppBinding
 class AllowListActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAllowListBinding
     private val adapter = AppPickerAdapter()
+    private val saveGate = AllowListGate()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,6 +28,7 @@ class AllowListActivity : AppCompatActivity() {
         binding.apps.layoutManager = LinearLayoutManager(this)
         binding.apps.adapter = adapter
         binding.buttonAdd.isEnabled = false
+        binding.buttonSave.isEnabled = saveGate.saveEnabled
         binding.filter.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
@@ -48,7 +50,9 @@ class AllowListActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
                 adapter.submit(apps, selected)
+                saveGate.onLoaded()
                 binding.buttonAdd.isEnabled = true
+                binding.buttonSave.isEnabled = saveGate.saveEnabled
                 binding.textEmpty.text = getString(R.string.allow_none)
                 updateEmpty()
             }

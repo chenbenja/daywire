@@ -1,6 +1,8 @@
 package com.chenbenja.daywire
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.chenbenja.daywire.core.mobile.Core
 import com.chenbenja.daywire.core.mobile.Mobile
 import java.io.File
@@ -9,7 +11,10 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 
 /**
- * One on-device store for the process. Calls are serialized on a single thread.
+ * One on-device store for the process. Opens and writes run on a single
+ * background thread. [call] blocks the caller, so the main thread must use
+ * [submit] or [whenReady] instead.
+ *
  * The generated types come from `./hack/android-bind.sh` (`-javapkg`).
  */
 internal object DaywireCore {
@@ -17,6 +22,7 @@ internal object DaywireCore {
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "daywire-core").apply { isDaemon = true }
     }
+    private val main = Handler(Looper.getMainLooper())
 
     @Volatile
     private var core: Core? = null
@@ -25,15 +31,51 @@ internal object DaywireCore {
     var openError: String? = null
         private set
 
-    fun open(context: Context) {
-        try {
-            call(context) { }
-        } catch (error: Exception) {
-            openError = error.message ?: "store open failed"
-            throw error
+    fun isOpen(): Boolean = core != null
+
+    /** Starts an open if needed. Does not wait. */
+    fun warm(context: Context) {
+        whenReady(context) {}
+    }
+
+    /**
+     * Runs [onMain] on the main looper after the store has been opened, or
+     * after the open has failed. Does not block the caller.
+     */
+    fun whenReady(context: Context, onMain: () -> Unit) {
+        val app = context.applicationContext
+        executor.execute {
+            try {
+                ensure(app)
+            } catch (error: Exception) {
+                if (core == null) {
+                    openError = error.message ?: "store open failed"
+                }
+                Trace.info("store open failed")
+            }
+            main.post(onMain)
         }
     }
 
+    /** Runs [block] on the store thread and does not wait. */
+    fun submit(context: Context, block: (Core) -> Unit) {
+        val app = context.applicationContext
+        executor.execute {
+            try {
+                block(ensure(app))
+            } catch (error: Exception) {
+                if (core == null) {
+                    openError = error.message ?: "store open failed"
+                }
+                Trace.info("store call failed")
+            }
+        }
+    }
+
+    /**
+     * Runs [block] on the store thread and waits. Do not call this from the
+     * main thread: the Go call can take as long as its timeout.
+     */
     fun <T> call(context: Context, block: (Core) -> T): T {
         val app = context.applicationContext
         try {
