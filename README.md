@@ -4,7 +4,7 @@
 
 Daywire is an open-source, phone-first life-context bridge. It turns the day into redacted semantic events and hands those events to the assistant you already use.
 
-**Status:** Week 1 localhost Go core. The process binds to loopback, stores redacted events in SQLite, and speaks MCP. Phone capture and on-device speech-to-text are later weeks. A laptop speaker-identification spike (`./hack/make.sh speaker`) enrolls a voice locally and labels that cluster `owner`. It does not send audio to assistants. Phone speaker models are still later.
+**Status:** Week 1 localhost Go core, plus a Week 2 Android shell. The laptop process binds to loopback, stores redacted events in SQLite, and speaks MCP. The phone app stores the same events on the device. A laptop speaker-identification spike (`./hack/make.sh speaker`) enrolls a voice locally and labels that cluster `owner`. It does not send audio to assistants, and it is not in the phone app. On-device speech-to-text is still later.
 
 **License:** TBD
 
@@ -21,7 +21,7 @@ The `daywire` binary:
 
 Assistants receive the redacted summary. There is no audio field and no upload route.
 
-What is intentionally absent is listed in [docs/poc-week1.md](docs/poc-week1.md). The laptop speaker spike is [docs/speaker-spike.md](docs/speaker-spike.md).
+What is intentionally absent from the laptop core is listed in [docs/poc-week1.md](docs/poc-week1.md). The laptop speaker spike is [docs/speaker-spike.md](docs/speaker-spike.md). The phone shell is [docs/poc-week2-android.md](docs/poc-week2-android.md).
 
 ## Speaker spike
 
@@ -33,6 +33,19 @@ What is intentionally absent is listed in [docs/poc-week1.md](docs/poc-week1.md)
 ```
 
 That build downloads the pinned models into `output/speaker-models/` (gitignored) and logs `label=owner` on the matching LibriSpeech reader. It is not the MCP server. Details are in [docs/speaker-spike.md](docs/speaker-spike.md).
+
+## Week 2 Android shell
+
+`android/` is a project Android Studio can open. Summaries and nudge text are AES-256-GCM on the phone; identifiers, types, times, and source names stay readable, and the database file is not encrypted as a whole. The key is a file in app-private storage, not the Android Keystore. The app asks before reading notifications or location, lists a folder you pick, and shows nudges with the phone's own notifications. ntfy is not used on the phone. Speech models are not in the app.
+
+Open the project only after the Go archive exists:
+
+```bash
+export ANDROID_HOME="$HOME/Android/Sdk"   # Android Studio's SDK path
+./hack/android-bind.sh
+```
+
+Then in Android Studio: File → Open → the `android/` directory. The click-by-click for notification access, location, and the folder picker is in [docs/poc-week2-android.md](docs/poc-week2-android.md).
 
 ## Build
 
@@ -127,6 +140,7 @@ The database is [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) (pur
 ## Docs
 
 - [Week 1 POC notes](docs/poc-week1.md)
+- [Week 2 Android shell](docs/poc-week2-android.md)
 - [Laptop speaker-id spike](docs/speaker-spike.md)
 - [Concept report (v5)](docs/research/daywire-concept-report.md)
 - [Research notes](docs/research/notes/)

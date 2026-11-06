@@ -22,8 +22,7 @@ Build and the client snippet are in the [README](../README.md).
 
 ## What is explicitly not in Week 1
 
-- Android, Kotlin, or gomobile
-- A notification listener, location visits from a phone, or a Storage Access Framework folder
+- The Android shell, notification listener, coarse location visits, and Storage Access Framework folder list. Those are Week 2: [poc-week2-android.md](poc-week2-android.md). The laptop process still does not include them.
 - On-device speech-to-text or Hebrew STT. A laptop speaker-id spike (`daywire speaker`) enrolls a public clip and labels a cluster locally. It is not an assistant audio path and not the phone model. See [speaker-spike.md](speaker-spike.md).
 - Any path that accepts or forwards raw call audio, images, or unredacted message bodies
 - Telegram as a default nudge channel (no bot token, no Telegram client)

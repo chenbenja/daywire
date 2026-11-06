@@ -4,3 +4,15 @@
 *.db-wal
 *.db-shm
 data.key
+
+# Android Studio and the generated gomobile archive.
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties
+/android/.idea/
+/android/.kotlin/
+/android/app/libs/*.partial
+/android/**/*.iml
+/android/app/libs/*.aar
+/android/app/libs/*.jar

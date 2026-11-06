@@ -116,6 +116,48 @@ func TestGetNotFound(t *testing.T) {
 	require.ErrorIs(t, err, store.ErrNotFound)
 }
 
+func TestLocalNudgeRoundTrip(t *testing.T) {
+	cfg := testutil.LoadConfig(t)
+	ctx := testutil.Context(t)
+	st := testutil.OpenStore(t, cfg)
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	in := store.Nudge{
+		ID:        "nudge-local-1",
+		CreatedAt: now,
+		Channel:   store.ChannelLocal,
+		Delivered: true,
+		Detail:    "shown",
+		Title:     "Synthetic nudge",
+		Message:   "nudge " + marker,
+	}
+	require.NoError(t, st.InsertNudge(ctx, in))
+
+	got, err := st.GetNudge(ctx, in.ID)
+	require.NoError(t, err)
+	require.Equal(t, store.ChannelLocal, got.Channel)
+	require.True(t, got.Delivered)
+	require.Equal(t, "shown", got.Detail)
+	require.Equal(t, in.Title, got.Title)
+	require.Equal(t, in.Message, got.Message)
+	require.True(t, got.CreatedAt.Equal(now))
+
+	_, err = st.GetNudge(ctx, "missing-nudge")
+	require.ErrorIs(t, err, store.ErrNudgeNotFound)
+
+	err = st.InsertNudge(ctx, store.Nudge{
+		ID:        "nudge-bad-channel",
+		CreatedAt: now,
+		Channel:   "carrier-pigeon",
+		Delivered: false,
+		Detail:    "no",
+		Title:     "Synthetic nudge",
+		Message:   "nudge " + marker,
+	})
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), marker)
+	require.NotContains(t, err.Error(), "Synthetic nudge")
+}
+
 func sample(typ event.Type, id string, at time.Time, summary string) event.Event {
 	return event.Event{
 		ID:         id,
