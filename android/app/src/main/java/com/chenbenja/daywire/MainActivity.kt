@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -88,11 +90,18 @@ class MainActivity : AppCompatActivity() {
                 applyVisitSession()
             }
         }
+        ActionStatus.setListener {
+            if (!isDestroyed) {
+                applyActionStatus()
+            }
+        }
         applyVisitSession()
+        applyActionStatus()
     }
 
     override fun onStop() {
         VisitSession.setListener(null)
+        ActionStatus.setListener(null)
         super.onStop()
     }
 
@@ -141,6 +150,14 @@ class MainActivity : AppCompatActivity() {
         refreshEvents()
     }
 
+    private fun applyActionStatus() {
+        val status = ActionStatus.snapshot() ?: return
+        setStatus(status.text)
+        if (!status.busy) {
+            refreshEvents()
+        }
+    }
+
     private fun onNudge() {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(
@@ -155,52 +172,40 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSampleNudge() {
+        val app = applicationContext
+        ActionStatus.begin(getString(R.string.nudge_working))
         Thread {
             val status = try {
-                LocalNudge.showSample(this)
+                LocalNudge.showSample(app)
             } catch (error: Throwable) {
-                error.message ?: getString(R.string.action_failed)
+                error.message ?: app.getString(R.string.action_failed)
             }
-            runOnUiThread {
-                if (isDestroyed) {
-                    return@runOnUiThread
-                }
-                setStatus(status)
-                refreshEvents()
-            }
+            ActionStatus.finish(status)
         }.start()
     }
 
     private fun insertSynthetic() {
+        val app = applicationContext
+        ActionStatus.begin(getString(R.string.note_working))
         Thread {
             val status = try {
-                DaywireCore.call(this) { core ->
+                DaywireCore.call(app) { core ->
                     core.insertRedactedNote(
                         "android:synthetic",
                         "Note: synthetic check from the Daywire shell.",
                         System.currentTimeMillis(),
                     )
                 }
-                getString(R.string.note_stored)
+                app.getString(R.string.note_stored)
             } catch (error: Throwable) {
-                error.message ?: getString(R.string.action_failed)
+                error.message ?: app.getString(R.string.action_failed)
             }
-            runOnUiThread {
-                if (isDestroyed) {
-                    return@runOnUiThread
-                }
-                setStatus(status)
-                refreshEvents()
-            }
+            ActionStatus.finish(status)
         }.start()
     }
 
     private fun refreshChrome() {
-        binding.textListener.text = if (listenerEnabled()) {
-            getString(R.string.listener_on)
-        } else {
-            getString(R.string.listener_off)
-        }
+        refreshListener()
         refreshAllowCount()
         val openError = (application as DaywireApp).openError
         val ready = DaywireCore.isOpen()
@@ -216,8 +221,28 @@ class MainActivity : AppCompatActivity() {
         refreshFolder()
     }
 
-    private fun listenerEnabled(): Boolean {
-        return NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
+    private var listenerGeneration = 0
+
+    private fun refreshListener() {
+        val generation = ++listenerGeneration
+        val app = applicationContext
+        Thread {
+            val enabled = try {
+                NotificationManagerCompat.getEnabledListenerPackages(app).contains(packageName)
+            } catch (error: Throwable) {
+                null
+            }
+            runOnUiThread {
+                if (isDestroyed || generation != listenerGeneration || enabled == null) {
+                    return@runOnUiThread
+                }
+                binding.textListener.text = if (enabled) {
+                    getString(R.string.listener_on)
+                } else {
+                    getString(R.string.listener_off)
+                }
+            }
+        }.start()
     }
 
     private var allowGeneration = 0
@@ -235,7 +260,7 @@ class MainActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
                 binding.textAllow.text = when {
-                    count < 0 -> getString(R.string.allow_empty)
+                    count < 0 -> getString(R.string.allow_unread)
                     count == 0 -> getString(R.string.allow_empty)
                     else -> getString(R.string.allow_count, count)
                 }
@@ -247,29 +272,49 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshFolder() {
         val generation = ++folderGeneration
-        val uri = FolderStore.current(this)
-        binding.buttonForget.isEnabled = uri != null
-        if (uri == null) {
-            binding.textFolder.text = getString(R.string.folder_none)
-            binding.textFiles.text = ""
-            return
-        }
-        binding.textFolder.text = getString(R.string.folder_picked)
+        val app = applicationContext
         Thread {
-            val listing = try {
-                FolderStore.listNames(this, uri)
-            } catch (error: Exception) {
+            var failed = false
+            val uri = try {
+                FolderStore.current(app)
+            } catch (error: Throwable) {
+                failed = true
                 null
+            }
+            val listing = if (uri == null) {
+                null
+            } else {
+                try {
+                    FolderStore.listNames(app, uri)
+                } catch (error: Throwable) {
+                    null
+                }
             }
             runOnUiThread {
                 if (isDestroyed || generation != folderGeneration) {
                     return@runOnUiThread
                 }
-                binding.textFiles.text = when {
-                    listing == null -> getString(R.string.folder_unavailable)
-                    listing.names.isEmpty() -> getString(R.string.folder_empty)
-                    listing.capped -> listing.names.joinToString("\n") + "\n" + getString(R.string.folder_capped)
-                    else -> listing.names.joinToString("\n")
+                binding.buttonForget.isEnabled = uri != null
+                when {
+                    failed -> {
+                        binding.textFolder.text = getString(R.string.folder_unavailable)
+                        binding.textFiles.text = ""
+                    }
+                    uri == null -> {
+                        binding.textFolder.text = getString(R.string.folder_none)
+                        binding.textFiles.text = ""
+                    }
+                    else -> {
+                        binding.textFolder.text = getString(R.string.folder_picked)
+                        binding.textFiles.text = when {
+                            listing == null -> getString(R.string.folder_unavailable)
+                            listing.names.isEmpty() -> getString(R.string.folder_empty)
+                            listing.capped -> {
+                                listing.names.joinToString("\n") + "\n" + getString(R.string.folder_capped)
+                            }
+                            else -> listing.names.joinToString("\n")
+                        }
+                    }
                 }
             }
         }.start()
@@ -336,3 +381,53 @@ class MainActivity : AppCompatActivity() {
         binding.textStatus.text = text
     }
 }
+
+/**
+ * In-flight sample-nudge and synthetic-note text. Same shape as [VisitSession]:
+ * the Activity can be recreated while the work is still running.
+ */
+internal object ActionStatus {
+    @Volatile
+    var busy: Boolean = false
+        private set
+
+    @Volatile
+    private var listener: (() -> Unit)? = null
+
+    @Volatile
+    private var pending: String? = null
+
+    private val main = Handler(Looper.getMainLooper())
+
+    fun setListener(listener: (() -> Unit)?) {
+        this.listener = listener
+    }
+
+    fun begin(waiting: String) {
+        busy = true
+        pending = waiting
+        dispatch()
+    }
+
+    fun finish(status: String) {
+        busy = false
+        pending = status
+        dispatch()
+    }
+
+    fun snapshot(): ActionSnapshot? {
+        val text = pending ?: return null
+        val stillBusy = busy
+        if (!stillBusy) {
+            pending = null
+        }
+        return ActionSnapshot(text, stillBusy)
+    }
+
+    private fun dispatch() {
+        val current = listener
+        main.post { current?.invoke() }
+    }
+}
+
+internal data class ActionSnapshot(val text: String, val busy: Boolean)

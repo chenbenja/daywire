@@ -47,13 +47,19 @@ fi
 # sources jar gomobile writes next to the staged archive.
 wrap=$(mktemp -d)
 trap 'rm -rf "${wrap}"' EXIT
-cat > "${wrap}/go" << EOF
-#!/bin/sh
-export GOTOOLCHAIN=local
-export GOROOT='${toolchain_root}'
-export PATH='${toolchain_root}/bin:${PATH}'
-exec '${realgo}' "\$@"
-EOF
+# Single-quote a string for the generated wrapper. A ' becomes '\''.
+shell_quote() {
+	local escaped
+	escaped=$(printf '%s' "$1" | sed "s/'/'\\\\''/g")
+	printf "'%s'" "${escaped}"
+}
+{
+	printf '%s\n' '#!/bin/sh'
+	printf '%s\n' 'export GOTOOLCHAIN=local'
+	printf 'export GOROOT=%s\n' "$(shell_quote "${toolchain_root}")"
+	printf 'export PATH=%s\n' "$(shell_quote "${toolchain_root}/bin:${PATH}")"
+	printf 'exec %s "$@"\n' "$(shell_quote "${realgo}")"
+} > "${wrap}/go"
 chmod +x "${wrap}/go"
 export PATH="${wrap}:${PATH}"
 
@@ -80,5 +86,10 @@ if printf '%s\n' "${listing}" | grep -Ei 'sherpa|onnxruntime|libonnx'; then
 fi
 
 mkdir -p "$(dirname "${out}")"
-mv "${staged}" "${out}"
+# Copy onto the destination filesystem, then rename into place so an
+# interrupted cross-directory move cannot leave a partial daywire.aar.
+partial="${out}.partial"
+rm -f "${partial}"
+cp -f "${staged}" "${partial}"
+mv -f "${partial}" "${out}"
 echo "wrote ${out}"

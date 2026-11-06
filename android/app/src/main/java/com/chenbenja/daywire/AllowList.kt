@@ -6,6 +6,23 @@ import android.content.Context
  * Save stays disabled until the app list has loaded, so an early tap cannot
  * replace a saved allow-list with an empty one.
  */
+/**
+ * While the list is still loading, keep the selection restored from the
+ * previous instance. Null means there is nothing unsaved to keep.
+ */
+internal fun allowSelectionForRotation(
+    loaded: Boolean,
+    current: Set<String>,
+    restored: Set<String>?,
+): Set<String>? = if (loaded) current else restored
+
+/** Custom rows that are not launchable apps, including ones the user unchecked. */
+internal fun allowCustomForRotation(
+    loaded: Boolean,
+    current: List<String>,
+    restored: List<String>,
+): List<String> = if (loaded) current else restored
+
 internal class AllowListGate {
     var saveEnabled: Boolean = false
         private set

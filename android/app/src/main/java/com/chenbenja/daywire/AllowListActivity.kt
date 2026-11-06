@@ -21,10 +21,12 @@ class AllowListActivity : AppCompatActivity() {
     private val adapter = AppPickerAdapter()
     private val saveGate = AllowListGate()
     private var restoredSelection: Set<String>? = null
+    private var restoredCustom: List<String> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         restoredSelection = savedInstanceState?.getStringArrayList(STATE_SELECTION)?.toSet()
+        restoredCustom = savedInstanceState?.getStringArrayList(STATE_CUSTOM)?.toList().orEmpty()
         binding = ActivityAllowListBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.apps.layoutManager = LinearLayoutManager(this)
@@ -47,16 +49,20 @@ class AllowListActivity : AppCompatActivity() {
         Thread {
             val apps = loadApps()
             val selected = restoredSelection ?: AllowList.packages(this)
+            val custom = restoredCustom
             runOnUiThread {
                 if (isDestroyed) {
                     return@runOnUiThread
                 }
-                adapter.submit(apps, selected)
+                for (pkg in custom) {
+                    adapter.rememberCustom(pkg)
+                }
                 for (pkg in selected) {
                     if (apps.none { it.packageName == pkg }) {
-                        adapter.addCustom(LaunchableApp(packageName = pkg, label = pkg, icon = null))
+                        adapter.rememberCustom(pkg)
                     }
                 }
+                adapter.submit(apps, selected)
                 saveGate.onLoaded()
                 binding.buttonAdd.isEnabled = true
                 binding.buttonSave.isEnabled = saveGate.saveEnabled
@@ -68,10 +74,18 @@ class AllowListActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        if (!saveGate.saveEnabled) {
-            return
-        }
-        outState.putStringArrayList(STATE_SELECTION, ArrayList(adapter.selection()))
+        val selection = allowSelectionForRotation(
+            saveGate.saveEnabled,
+            adapter.selection(),
+            restoredSelection,
+        ) ?: return
+        outState.putStringArrayList(STATE_SELECTION, ArrayList(selection))
+        val custom = allowCustomForRotation(
+            saveGate.saveEnabled,
+            adapter.customPackages(),
+            restoredCustom,
+        )
+        outState.putStringArrayList(STATE_CUSTOM, ArrayList(custom))
     }
 
     private fun addTypedPackage() {
@@ -125,6 +139,7 @@ class AllowListActivity : AppCompatActivity() {
 
     companion object {
         private const val STATE_SELECTION = "allow_selection"
+        private const val STATE_CUSTOM = "allow_custom"
 
         // Same shape as cleanPackage in internal/mobile/redact.go.
         private val packagePattern = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$")
@@ -145,18 +160,34 @@ internal class AppPickerAdapter : RecyclerView.Adapter<AppPickerAdapter.Holder>(
     private val all = ArrayList<LaunchableApp>()
     private val shown = ArrayList<LaunchableApp>()
     private val selected = HashSet<String>()
+    private val custom = ArrayList<String>()
     private var query = ""
+
+    fun rememberCustom(packageName: String) {
+        if (!custom.contains(packageName)) {
+            custom.add(packageName)
+        }
+    }
+
+    fun customPackages(): List<String> = custom.toList()
 
     fun submit(apps: List<LaunchableApp>, initiallySelected: Set<String>) {
         all.clear()
         all.addAll(apps)
         selected.clear()
         selected.addAll(initiallySelected)
+        for (pkg in custom) {
+            if (all.none { it.packageName == pkg }) {
+                all.add(LaunchableApp(packageName = pkg, label = pkg, icon = null))
+            }
+        }
+        all.sortBy { it.label.lowercase() }
         applyFilter()
     }
 
     fun addCustom(app: LaunchableApp) {
         if (all.none { it.packageName == app.packageName }) {
+            rememberCustom(app.packageName)
             all.add(app)
             all.sortBy { it.label.lowercase() }
         }

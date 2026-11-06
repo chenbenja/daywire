@@ -8,6 +8,40 @@ import org.junit.Test
 
 class ShellGuardsTest {
     @Test
+    fun rotationBeforeLoadKeepsTheRestoredSelection() {
+        val restored = setOf("com.example.mail")
+        assertEquals(
+            restored,
+            allowSelectionForRotation(loaded = false, current = emptySet(), restored = restored),
+        )
+        assertEquals(
+            emptySet<String>(),
+            allowSelectionForRotation(loaded = true, current = emptySet(), restored = restored),
+        )
+        assertEquals(
+            null,
+            allowSelectionForRotation(loaded = false, current = emptySet(), restored = null),
+        )
+    }
+
+    @Test
+    fun rotationKeepsAnUncheckedCustomRow() {
+        val restored = listOf("com.example.custom")
+        assertEquals(
+            restored,
+            allowCustomForRotation(loaded = false, current = emptyList(), restored = restored),
+        )
+        assertEquals(
+            listOf("com.example.custom"),
+            allowCustomForRotation(
+                loaded = true,
+                current = listOf("com.example.custom"),
+                restored = emptyList(),
+            ),
+        )
+    }
+
+    @Test
     fun saveStaysOffUntilTheListHasLoaded() {
         val gate = AllowListGate()
         assertFalse(gate.saveEnabled)

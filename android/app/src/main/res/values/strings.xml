@@ -18,6 +18,7 @@
     <string name="listener_on">Notification access is on.</string>
     <string name="listener_off">Notification access is off.</string>
     <string name="allow_empty">Allowed apps: none.</string>
+    <string name="allow_unread">Could not read the allow-list.</string>
     <string name="allow_count">Allowed apps: %1$d.</string>
     <string name="allow_title">Allowed apps</string>
     <string name="allow_help">Checked apps can become notes. Nothing is captured from the others. Apps without a home-screen icon can be added by package name.</string>
@@ -55,6 +56,8 @@
     <string name="section_nudge">Nudge</string>
     <string name="nudge_help">Shows a notification from this app and records it in the store. ntfy is not used.</string>
     <string name="show_nudge">Show a sample nudge</string>
+    <string name="nudge_working">Showing a sample nudge.</string>
+    <string name="note_working">Storing a synthetic note.</string>
     <string name="nudge_shown">Sample nudge shown on this phone.</string>
     <string name="nudge_not_shown">Notifications are off for Daywire, so the nudge was recorded as not shown.</string>
     <string name="nudge_permission_denied">Notification permission was not granted, so the sample nudge was not shown.</string>
