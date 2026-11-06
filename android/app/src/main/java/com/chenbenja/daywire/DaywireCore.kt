@@ -3,6 +3,7 @@ package com.chenbenja.daywire
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.WorkerThread
 import com.chenbenja.daywire.core.mobile.Core
 import com.chenbenja.daywire.core.mobile.Mobile
 import java.io.File
@@ -47,7 +48,7 @@ internal object DaywireCore {
         executor.execute {
             try {
                 ensure(app)
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 if (core == null) {
                     openError = error.message ?: "store open failed"
                 }
@@ -63,7 +64,7 @@ internal object DaywireCore {
         executor.execute {
             try {
                 block(ensure(app))
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 if (core == null) {
                     openError = error.message ?: "store open failed"
                 }
@@ -73,19 +74,28 @@ internal object DaywireCore {
     }
 
     /**
-     * Runs [block] on the store thread and waits. Do not call this from the
-     * main thread: the Go call can take as long as its timeout.
+     * Runs [block] on the store thread and waits. Throws if called on the main
+     * thread: the Go call can take as long as its timeout.
      */
+    @WorkerThread
     fun <T> call(context: Context, block: (Core) -> T): T {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            throw IllegalStateException("store call on the main thread")
+        }
         val app = context.applicationContext
         try {
-            return executor.submit(Callable { block(ensure(app)) }).get()
+            return executor.submit(Callable {
+                try {
+                    block(ensure(app))
+                } catch (error: Throwable) {
+                    if (core == null) {
+                        openError = error.message ?: "store open failed"
+                    }
+                    throw error
+                }
+            }).get()
         } catch (error: ExecutionException) {
-            val cause = error.cause
-            if (cause is Exception) {
-                throw cause
-            }
-            throw error
+            throw error.cause ?: error
         }
     }
 

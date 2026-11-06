@@ -12,7 +12,8 @@ import androidx.core.content.ContextCompat
 
 /**
  * The phone nudge path. It uses NotificationCompat and records channel "local".
- * It does not call ntfy. A blocked channel is recorded as not shown.
+ * It does not call ntfy. A blocked channel or channel group is recorded as not
+ * shown. The store write does not block the caller.
  */
 internal object LocalNudge {
     const val CHANNEL_ID = "daywire_nudges"
@@ -36,14 +37,8 @@ internal object LocalNudge {
 
     fun showSample(context: Context): String {
         val compat = NotificationManagerCompat.from(context)
-        val posted = Build.VERSION.SDK_INT < 33 ||
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) == PackageManager.PERMISSION_GRANTED
         val channel = compat.getNotificationChannel(CHANNEL_ID)
-        val channelOpen = channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
-        if (!posted || !compat.areNotificationsEnabled() || !channelOpen) {
+        if (!canShow(context, compat, channel)) {
             record(context, shown = false)
             return context.getString(R.string.nudge_not_shown)
         }
@@ -54,9 +49,18 @@ internal object LocalNudge {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
-        compat.notify(SAMPLE_ID, notification)
-        record(context, shown = true)
-        return context.getString(R.string.nudge_shown)
+        if (Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            compat.notify(SAMPLE_ID, notification)
+            record(context, shown = true)
+            return context.getString(R.string.nudge_shown)
+        }
+        record(context, shown = false)
+        return context.getString(R.string.nudge_not_shown)
     }
 
     fun recordUnshown(context: Context) {
@@ -64,8 +68,28 @@ internal object LocalNudge {
     }
 
     private fun record(context: Context, shown: Boolean) {
-        DaywireCore.call(context) { core ->
+        DaywireCore.submit(context) { core ->
             core.recordLocalNudge(SAMPLE_TITLE, SAMPLE_TEXT, shown)
         }
+    }
+
+    private fun canShow(
+        context: Context,
+        compat: NotificationManagerCompat,
+        channel: NotificationChannel?,
+    ): Boolean {
+        val posted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+        val channelOpen = channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
+        return posted && compat.areNotificationsEnabled() && channelOpen && !groupBlocked(compat, channel)
+    }
+
+    private fun groupBlocked(compat: NotificationManagerCompat, channel: NotificationChannel?): Boolean {
+        val groupId = channel?.group ?: return false
+        val group = compat.getNotificationChannelGroup(groupId) ?: return false
+        return group.isBlocked
     }
 }

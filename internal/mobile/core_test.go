@@ -231,6 +231,7 @@ func TestNotificationAndVisitRoundTrip(t *testing.T) {
 	require.NotContains(t, logs.String(), "78111999")
 	require.NotContains(t, logs.String(), body)
 	require.NotContains(t, logs.String(), "Example Mail")
+	require.NotContains(t, logs.String(), "com.example.mail")
 }
 
 func TestRecordLocalNudgeWithoutDelivery(t *testing.T) {

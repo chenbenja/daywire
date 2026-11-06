@@ -88,6 +88,21 @@ class MainActivity : AppCompatActivity() {
         binding.buttonRefresh.setOnClickListener { refreshEvents() }
     }
 
+    override fun onStart() {
+        super.onStart()
+        VisitSession.setListener {
+            if (!isDestroyed) {
+                applyVisitSession()
+            }
+        }
+        applyVisitSession()
+    }
+
+    override fun onStop() {
+        VisitSession.setListener(null)
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
         refreshChrome()
@@ -101,6 +116,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onVisit() {
+        if (VisitSession.inFlight) {
+            return
+        }
         val granted = ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -113,15 +131,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun captureVisit() {
-        val host = java.lang.ref.WeakReference(this)
-        CoarseVisit.capture(this, alive = { host.get()?.isDestroyed == false }) { status ->
-            val activity = host.get() ?: return@capture
-            if (activity.isDestroyed) {
-                return@capture
-            }
-            activity.setStatus(status)
-            activity.refreshEvents()
+        if (VisitSession.inFlight) {
+            return
         }
+        CoarseVisit.capture(this)
+    }
+
+    private fun applyVisitSession() {
+        binding.buttonVisit.isEnabled = DaywireCore.isOpen() && !VisitSession.inFlight
+        if (VisitSession.inFlight) {
+            setStatus(getString(R.string.location_waiting))
+            return
+        }
+        val status = VisitSession.takeStatus() ?: return
+        setStatus(status)
+        refreshEvents()
     }
 
     private fun onNudge() {
@@ -191,7 +215,7 @@ class MainActivity : AppCompatActivity() {
             ready -> getString(R.string.store_open)
             else -> getString(R.string.store_opening)
         }
-        binding.buttonVisit.isEnabled = ready
+        binding.buttonVisit.isEnabled = ready && !VisitSession.inFlight
         binding.buttonNudge.isEnabled = ready
         binding.buttonSynthetic.isEnabled = ready
         binding.buttonRefresh.isEnabled = ready
@@ -202,7 +226,10 @@ class MainActivity : AppCompatActivity() {
         return NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
     }
 
+    private var folderGeneration = 0
+
     private fun refreshFolder() {
+        val generation = ++folderGeneration
         val uri = FolderStore.current(this)
         binding.buttonForget.isEnabled = uri != null
         if (uri == null) {
@@ -218,7 +245,7 @@ class MainActivity : AppCompatActivity() {
                 null
             }
             runOnUiThread {
-                if (isDestroyed) {
+                if (isDestroyed || generation != folderGeneration) {
                     return@runOnUiThread
                 }
                 binding.textFiles.text = when {

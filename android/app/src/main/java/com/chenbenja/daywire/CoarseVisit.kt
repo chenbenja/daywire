@@ -2,7 +2,6 @@ package com.chenbenja.daywire
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.location.Location
 import android.location.LocationManager
 import android.os.CancellationSignal
 import android.os.Handler
@@ -18,7 +17,51 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * [LocationManagerCompat.getCurrentLocation] supplies the API 29 callback
  * itself, so this file does not declare one.
+ *
+ * Status is kept in [VisitSession] so a rotation can still show it. The
+ * capture does not hold the Activity.
  */
+internal object VisitSession {
+    @Volatile
+    var inFlight: Boolean = false
+        private set
+
+    @Volatile
+    private var listener: (() -> Unit)? = null
+
+    @Volatile
+    private var pendingStatus: String? = null
+
+    private val main = Handler(Looper.getMainLooper())
+
+    fun setListener(listener: (() -> Unit)?) {
+        this.listener = listener
+    }
+
+    fun finish(status: String) {
+        inFlight = false
+        pendingStatus = status
+        dispatch()
+    }
+
+    fun begin() {
+        inFlight = true
+        pendingStatus = null
+        dispatch()
+    }
+
+    fun takeStatus(): String? {
+        val status = pendingStatus
+        pendingStatus = null
+        return status
+    }
+
+    private fun dispatch() {
+        val current = listener
+        main.post { current?.invoke() }
+    }
+}
+
 internal object CoarseVisit {
     private const val TIMEOUT_MS = 20_000L
     private val callbacks = Executors.newSingleThreadExecutor { runnable ->
@@ -26,39 +69,45 @@ internal object CoarseVisit {
     }
 
     @SuppressLint("MissingPermission")
-    fun capture(context: Context, alive: () -> Boolean, onStatus: (String) -> Unit) {
+    fun capture(context: Context) {
+        if (VisitSession.inFlight) {
+            return
+        }
         val app = context.applicationContext
         val missing = app.getString(R.string.location_missing)
         val stored = app.getString(R.string.location_stored)
         val failed = app.getString(R.string.action_failed)
         val denied = app.getString(R.string.location_permission_denied)
         val off = app.getString(R.string.location_off)
+        val noProvider = app.getString(R.string.location_no_network_provider)
         val timedOut = app.getString(R.string.location_timeout)
-        val main = Handler(Looper.getMainLooper())
-        fun postStatus(text: String) {
-            main.post {
-                if (!alive()) {
-                    return@post
-                }
-                onStatus(text)
-            }
-        }
         val manager = app.getSystemService(LocationManager::class.java)
-        val enabled = try {
+        val locationOn = try {
+            manager.isLocationEnabled
+        } catch (error: Exception) {
+            false
+        }
+        val network = try {
             manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         } catch (error: IllegalArgumentException) {
             false
         }
-        if (!enabled) {
-            postStatus(off)
+        if (!locationOn) {
+            VisitSession.finish(off)
             return
         }
+        if (!network) {
+            VisitSession.finish(noProvider)
+            return
+        }
+        VisitSession.begin()
         val cancel = CancellationSignal()
         val finished = AtomicBoolean(false)
+        val main = Handler(Looper.getMainLooper())
         val timeout = Runnable {
             if (finished.compareAndSet(false, true)) {
                 cancel.cancel()
-                postStatus(timedOut)
+                VisitSession.finish(timedOut)
             }
         }
         main.postDelayed(timeout, TIMEOUT_MS)
@@ -74,7 +123,7 @@ internal object CoarseVisit {
                     }
                     main.removeCallbacks(timeout)
                     if (location == null) {
-                        postStatus(missing)
+                        VisitSession.finish(missing)
                         return@Consumer
                     }
                     val shown = try {
@@ -85,13 +134,13 @@ internal object CoarseVisit {
                     } catch (error: Exception) {
                         error.message ?: failed
                     }
-                    postStatus(shown)
+                    VisitSession.finish(shown)
                 },
             )
         } catch (error: SecurityException) {
             if (finished.compareAndSet(false, true)) {
                 main.removeCallbacks(timeout)
-                postStatus(denied)
+                VisitSession.finish(denied)
             }
         }
     }

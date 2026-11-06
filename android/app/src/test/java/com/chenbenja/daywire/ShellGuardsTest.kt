@@ -1,5 +1,6 @@
 package com.chenbenja.daywire
 
+import android.app.Notification
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -26,5 +27,22 @@ class ShellGuardsTest {
         val listing = capSortedNames(listOf("b.txt", "a.txt"), 2)
         assertEquals(listOf("a.txt", "b.txt"), listing.names)
         assertFalse(listing.capped)
+    }
+
+    @Test
+    fun ongoingForegroundAndGroupSummariesAreSkipped() {
+        assertTrue(shouldSkipPostedFlags(Notification.FLAG_ONGOING_EVENT))
+        assertTrue(shouldSkipPostedFlags(Notification.FLAG_FOREGROUND_SERVICE))
+        assertTrue(shouldSkipPostedFlags(Notification.FLAG_GROUP_SUMMARY))
+        assertFalse(shouldSkipPostedFlags(0))
+    }
+
+    @Test
+    fun theSameKeyIsOneEventInsideTheWindow() {
+        val dedupe = NotificationDedupe(windowMs = 60_000L)
+        assertTrue(dedupe.accept("pkg/1", nowMs = 1_000L))
+        assertFalse(dedupe.accept("pkg/1", nowMs = 30_000L))
+        assertTrue(dedupe.accept("pkg/1", nowMs = 61_000L))
+        assertTrue(dedupe.accept("pkg/2", nowMs = 61_000L))
     }
 }

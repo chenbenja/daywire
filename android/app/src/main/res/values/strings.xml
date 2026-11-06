@@ -28,13 +28,13 @@
     <string name="allow_loading">Loading apps…</string>
     <string name="allow_none">No apps match.</string>
     <string name="allow_bad_package">That does not look like an Android package name.</string>
-    <string name="allow_saved">Allow-list saved.</string>
-
     <string name="section_location">Location</string>
     <string name="location_help">Off until you tap the button. Daywire asks for approximate location, takes one fix, and stores a coarse grid. It does not track in the background, and it does not log precise coordinates.</string>
     <string name="record_visit">Record a coarse visit</string>
     <string name="location_permission_denied">Approximate location was not granted, so no visit was stored.</string>
     <string name="location_off">Location is turned off in system settings, so no visit was stored.</string>
+    <string name="location_no_network_provider">Location is on, but this device has no network location provider, so no visit was stored.</string>
+    <string name="location_waiting">Waiting for an approximate location.</string>
     <string name="location_missing">No approximate location yet, so no visit was stored.</string>
     <string name="location_timeout">No approximate location arrived in time, so no visit was stored.</string>
     <string name="location_stored">Coarse visit stored.</string>

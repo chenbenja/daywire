@@ -72,7 +72,7 @@ export ANDROID_HOME="$HOME/Android/Sdk"
 ./hack/android-bind.sh
 ```
 
-The script installs `gomobile` if it is missing and writes `android/app/libs/daywire.aar`. That archive is gitignored. Re-run the script when the Go API changes. The bind needs an NDK: in the SDK manager, install **NDK (Side by side)**. Android Gradle Plugin 9.5's default is 28.2.13676358. The bind targets are arm64 (phones) and amd64 (the usual emulator). A 32-bit device needs `android/arm` or `android/386` added to `-target` in `hack/android-bind.sh`.
+The script always reinstalls the module's `gomobile` and `gobind` into `output/android-bind-bin` (gitignored), then writes `android/app/libs/daywire.aar` only after checking the archive for speech libraries. That archive is gitignored. Re-run the script when the Go API changes. The bind needs an NDK: in the SDK manager, install **NDK (Side by side)**. Android Gradle Plugin 9.5's default is 28.2.13676358. The bind targets are arm64 (phones) and amd64 (the usual emulator). A 32-bit device needs `android/arm` or `android/386` added to `-target` in `hack/android-bind.sh`. The Gradle wrapper jar in this repo is not checksum-verified in this slice.
 
 `go.mod` records `gobind` as a Go tool (`tool golang.org/x/mobile/cmd/gobind`). That is how Go 1.26's gomobile finds the binder. It is not linked into the laptop `daywire` binary. The bind script also forces that Go 1.26 toolchain to stay local: current gomobile writes a patchless `go 1.26` line, and `GOTOOLCHAIN=auto` would then look for a release named `go1.26`, which does not exist.
 
@@ -93,7 +93,7 @@ Checked on this branch: `./hack/make.sh all` passes; `./hack/android-bind.sh` wr
 
 ## On a phone
 
-Install the debug build and open Daywire. The store line should say the store is open once the background open finishes. Events live in the app's private no-backup directory (`no_backup/store/events.db` and `data.key` inside the app sandbox). Backup to the cloud is off. `data.key` is a raw 32-byte key file next to the database, protected by the app sandbox and file-based encryption. It is not wrapped in the Android Keystore. The key rules otherwise match Week 1: the file is generated unless `DAYWIRE_DATA_KEY` or `DAYWIRE_DATA_KEY_FILE` is set, which they are not on a phone.
+Install the debug build and open Daywire. The store line should say the store is open once the background open finishes. Events live in the app's private no-backup directory (`no_backup/store/events.db` and `data.key` inside the app sandbox). Backup to the cloud is off. `data.key` is a raw 32-byte key file next to the database, protected by the app sandbox and file-based encryption. It is not wrapped in the Android Keystore. A debug build is debuggable, so `adb shell run-as com.chenbenja.daywire` can read both `no_backup/store/data.key` and `events.db`. The key rules otherwise match Week 1: the file is generated unless `DAYWIRE_DATA_KEY` or `DAYWIRE_DATA_KEY_FILE` is set, which they are not on a phone.
 
 ### Notification access
 
@@ -114,7 +114,7 @@ Install the debug build and open Daywire. The store line should say the store is
 ### Folder
 
 1. Tap **Pick a folder** and choose the directory in the system picker.
-2. Daywire lists top-level names, in alphabetical order. Directories are shown with a trailing slash. More than 200 names are shortened to the first 200 after sorting. A folder with exactly 200 names is not marked as shortened. Names are shown on screen and are not stored, logged, or opened.
+2. Daywire lists top-level names, sorted by Unicode code point (uppercase before lowercase, not dictionary order). Directories are shown with a trailing slash. More than 200 names are shortened to the first 200 after that sort. A folder with exactly 200 names is not marked as shortened. Names are shown on screen and are not stored, logged, or opened.
 3. **Forget folder** drops the permission. It does not delete the files.
 
 ### Nudge
