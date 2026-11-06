@@ -20,6 +20,9 @@ if ! command -v unzip >/dev/null 2>&1; then
 	exit 1
 fi
 
+# Drop a partial publish left by a killed earlier run. The trap covers this run.
+rm -f android/app/libs/daywire.aar.partial
+
 gopath=$(go env GOPATH)
 # Install the module's gomobile and gobind into a local bin so a stale
 # copy earlier on PATH cannot win. Versions come from go.mod.
@@ -45,8 +48,11 @@ if [[ ! -x "${realgo}" ]]; then
 fi
 # Portable on GNU and BSD/macOS. The directory also holds the sibling
 # sources jar gomobile writes next to the staged archive.
+out="android/app/libs/daywire.aar"
+partial="${out}.partial"
+rm -f "${partial}"
 wrap=$(mktemp -d)
-trap 'rm -rf "${wrap}"' EXIT
+trap 'rm -rf "${wrap}"; rm -f "${partial}"' EXIT
 # Single-quote a string for the generated wrapper. A ' becomes '\''.
 shell_quote() {
 	local escaped
@@ -65,7 +71,6 @@ export PATH="${wrap}:${PATH}"
 
 gomobile init
 
-out="android/app/libs/daywire.aar"
 staged="${wrap}/daywire.aar"
 # Phones are arm64. The Studio emulator on a typical laptop is amd64.
 # Add android/arm,android/386 to -target if a 32-bit device is required.

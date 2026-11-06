@@ -56,9 +56,11 @@ class MainActivity : AppCompatActivity() {
             setStatus(getString(R.string.folder_not_persistent))
             return@registerForActivityResult
         }
-        FolderStore.replace(this, uri)
-        refreshFolder()
-        setStatus(getString(R.string.folder_picked))
+        binding.buttonForget.isEnabled = false
+        val picked = uri
+        refreshFolder(FolderChange.PICK) { app ->
+            FolderStore.replace(app, picked)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,11 +75,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.buttonVisit.setOnClickListener { onVisit() }
         binding.buttonFolder.setOnClickListener { openTree.launch(null) }
-        binding.buttonForget.setOnClickListener {
-            FolderStore.forget(this)
-            refreshFolder()
-            setStatus(getString(R.string.folder_forgotten))
-        }
+        binding.buttonForget.setOnClickListener { forgetFolder() }
         binding.buttonNudge.setOnClickListener { onNudge() }
         binding.buttonSynthetic.setOnClickListener { insertSynthetic() }
         binding.buttonRefresh.setOnClickListener { refreshEvents() }
@@ -151,7 +149,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyActionStatus() {
-        val status = ActionStatus.snapshot() ?: return
+        val ready = DaywireCore.isOpen()
+        val status = ActionStatus.snapshot()
+        val busy = status?.busy == true
+        binding.buttonNudge.isEnabled = ready && !busy
+        binding.buttonSynthetic.isEnabled = ready && !busy
+        if (status == null) {
+            return
+        }
         setStatus(status.text)
         if (!status.busy) {
             refreshEvents()
@@ -168,12 +173,17 @@ class MainActivity : AppCompatActivity() {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
+        if (ActionStatus.busy) {
+            return
+        }
         showSampleNudge()
     }
 
     private fun showSampleNudge() {
         val app = applicationContext
-        ActionStatus.begin(getString(R.string.nudge_working))
+        if (!ActionStatus.begin(getString(R.string.nudge_working))) {
+            return
+        }
         Thread {
             val status = try {
                 LocalNudge.showSample(app)
@@ -186,7 +196,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun insertSynthetic() {
         val app = applicationContext
-        ActionStatus.begin(getString(R.string.note_working))
+        if (!ActionStatus.begin(getString(R.string.note_working))) {
+            return
+        }
         Thread {
             val status = try {
                 DaywireCore.call(app) { core ->
@@ -215,8 +227,8 @@ class MainActivity : AppCompatActivity() {
             else -> getString(R.string.store_opening)
         }
         binding.buttonVisit.isEnabled = ready && !VisitSession.inFlight
-        binding.buttonNudge.isEnabled = ready
-        binding.buttonSynthetic.isEnabled = ready
+        binding.buttonNudge.isEnabled = ready && !ActionStatus.busy
+        binding.buttonSynthetic.isEnabled = ready && !ActionStatus.busy
         binding.buttonRefresh.isEnabled = ready
         refreshFolder()
     }
@@ -270,15 +282,33 @@ class MainActivity : AppCompatActivity() {
 
     private var folderGeneration = 0
 
-    private fun refreshFolder() {
+    private fun forgetFolder() {
+        binding.buttonForget.isEnabled = false
+        refreshFolder(FolderChange.FORGET) { app ->
+            FolderStore.forget(app)
+        }
+    }
+
+    private fun refreshFolder(
+        change: FolderChange = FolderChange.NONE,
+        mutate: ((android.content.Context) -> Unit)? = null,
+    ) {
         val generation = ++folderGeneration
         val app = applicationContext
         Thread {
-            var failed = false
+            var writeFailed = false
+            if (mutate != null) {
+                try {
+                    mutate(app)
+                } catch (error: Throwable) {
+                    writeFailed = true
+                }
+            }
+            var readFailed = false
             val uri = try {
                 FolderStore.current(app)
             } catch (error: Throwable) {
-                failed = true
+                readFailed = true
                 null
             }
             val listing = if (uri == null) {
@@ -296,8 +326,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 binding.buttonForget.isEnabled = uri != null
                 when {
-                    failed -> {
-                        binding.textFolder.text = getString(R.string.folder_unavailable)
+                    readFailed -> {
+                        binding.textFolder.text = getString(R.string.folder_read_failed)
                         binding.textFiles.text = ""
                     }
                     uri == null -> {
@@ -315,6 +345,13 @@ class MainActivity : AppCompatActivity() {
                             else -> listing.names.joinToString("\n")
                         }
                     }
+                }
+                if (!writeFailed && change == FolderChange.FORGET && uri == null) {
+                    setStatus(getString(R.string.folder_forgotten))
+                } else if (!writeFailed && change == FolderChange.PICK && uri != null) {
+                    setStatus(getString(R.string.folder_picked))
+                } else if (writeFailed) {
+                    setStatus(getString(R.string.folder_write_failed))
                 }
             }
         }.start()
@@ -387,47 +424,64 @@ class MainActivity : AppCompatActivity() {
  * the Activity can be recreated while the work is still running.
  */
 internal object ActionStatus {
-    @Volatile
-    var busy: Boolean = false
-        private set
-
-    @Volatile
-    private var listener: (() -> Unit)? = null
-
-    @Volatile
-    private var pending: String? = null
-
+    private val lock = Any()
     private val main = Handler(Looper.getMainLooper())
+    private var listener: (() -> Unit)? = null
+    private var pending: String? = null
+    private var busyFlag = false
+
+    val busy: Boolean
+        get() = synchronized(lock) { busyFlag }
 
     fun setListener(listener: (() -> Unit)?) {
-        this.listener = listener
+        synchronized(lock) {
+            this.listener = listener
+        }
     }
 
-    fun begin(waiting: String) {
-        busy = true
-        pending = waiting
+    /** Returns false when another sample nudge or synthetic note is already running. */
+    fun begin(waiting: String): Boolean {
+        synchronized(lock) {
+            if (busyFlag) {
+                return false
+            }
+            busyFlag = true
+            pending = waiting
+        }
         dispatch()
+        return true
     }
 
     fun finish(status: String) {
-        busy = false
-        pending = status
+        synchronized(lock) {
+            busyFlag = false
+            pending = status
+        }
         dispatch()
     }
 
     fun snapshot(): ActionSnapshot? {
-        val text = pending ?: return null
-        val stillBusy = busy
-        if (!stillBusy) {
-            pending = null
+        val current = synchronized(lock) {
+            val text = pending ?: return null
+            val stillBusy = busyFlag
+            if (!stillBusy) {
+                pending = null
+            }
+            ActionSnapshot(text, stillBusy)
         }
-        return ActionSnapshot(text, stillBusy)
+        return current
     }
 
     private fun dispatch() {
-        val current = listener
+        val current = synchronized(lock) { listener }
         main.post { current?.invoke() }
     }
+}
+
+private enum class FolderChange {
+    NONE,
+    PICK,
+    FORGET,
 }
 
 internal data class ActionSnapshot(val text: String, val busy: Boolean)

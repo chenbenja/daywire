@@ -52,6 +52,8 @@
     <string name="folder_not_persistent">That folder cannot be kept. Nothing was saved and no file was opened.</string>
     <string name="folder_forgotten">Folder forgotten. The files were not deleted.</string>
     <string name="folder_unavailable">That folder is no longer readable.</string>
+    <string name="folder_read_failed">Could not read the saved folder.</string>
+    <string name="folder_write_failed">Could not update the saved folder.</string>
 
     <string name="section_nudge">Nudge</string>
     <string name="nudge_help">Shows a notification from this app and records it in the store. ntfy is not used.</string>

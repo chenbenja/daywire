@@ -3,10 +3,6 @@ package com.chenbenja.daywire
 import android.content.Context
 
 /**
- * Save stays disabled until the app list has loaded, so an early tap cannot
- * replace a saved allow-list with an empty one.
- */
-/**
  * While the list is still loading, keep the selection restored from the
  * previous instance. Null means there is nothing unsaved to keep.
  */
@@ -23,6 +19,10 @@ internal fun allowCustomForRotation(
     restored: List<String>,
 ): List<String> = if (loaded) current else restored
 
+/**
+ * Save stays disabled until the app list has loaded, so an early tap cannot
+ * replace a saved allow-list with an empty one.
+ */
 internal class AllowListGate {
     var saveEnabled: Boolean = false
         private set
