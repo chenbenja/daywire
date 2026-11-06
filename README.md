@@ -4,7 +4,7 @@
 
 Daywire is an open-source, phone-first life-context bridge. It turns the day into redacted semantic events and hands those events to the assistant you already use.
 
-**Status:** Week 1 localhost Go core. The process binds to loopback, stores redacted events in SQLite, and speaks MCP. Phone capture and on-device speech-to-text are later weeks. A laptop speaker-identification spike (`daywire speaker`) enrolls a voice locally and labels that cluster `owner`. It does not send audio to assistants. Phone speaker models are still later.
+**Status:** Week 1 localhost Go core. The process binds to loopback, stores redacted events in SQLite, and speaks MCP. Phone capture and on-device speech-to-text are later weeks. A laptop speaker-identification spike (`./hack/make.sh speaker`) enrolls a voice locally and labels that cluster `owner`. It does not send audio to assistants. Phone speaker models are still later.
 
 **License:** TBD
 
@@ -25,13 +25,14 @@ What is intentionally absent is listed in [docs/poc-week1.md](docs/poc-week1.md)
 
 ## Speaker spike
 
-`daywire speaker` is a local enroll-then-label check. It is not speech-to-text and it does not attach audio to events.
+`daywire speaker` on the Week 1 binary (`./hack/make.sh all`, `CGO_ENABLED=0`) reports that the engine is unavailable. The enroll-then-label check is a separate build so `serve` does not link sherpa:
 
 ```bash
-./output/daywire speaker demo --data-dir /tmp/daywire-speaker
+./hack/make.sh speaker
+./output/daywire-speaker speaker demo --data-dir /tmp/daywire-speaker
 ```
 
-The first run downloads the pinned sherpa-onnx models into `output/speaker-models/` (gitignored). The command stores an encrypted embedding and logs `label=owner` on the matching cluster of a two-speaker public clip. Linking the command needs cgo (a C compiler). `CGO_ENABLED=0` still builds `serve`, `doctor`, and `seed`; `speaker` then reports that the engine is unavailable. Details, model choice, and fixture licences are in [docs/speaker-spike.md](docs/speaker-spike.md).
+That build downloads the pinned models into `output/speaker-models/` (gitignored) and logs `label=owner` on the matching LibriSpeech reader. It is not the MCP server. Details are in [docs/speaker-spike.md](docs/speaker-spike.md).
 
 ## Build
 
@@ -41,7 +42,7 @@ Requires Go 1.26 (the `go` directive in `go.mod`; the toolchain downloads it whe
 ./hack/make.sh all
 ```
 
-That runs `gofmt -l`, `go vet`, `go test -race ./...`, and writes `output/daywire`. The Makefile calls the same script: `make all`, `make test`, `make build`.
+That runs `gofmt -l`, `go vet`, `go test -race ./...`, and writes `output/daywire` with `CGO_ENABLED=0`. The Makefile calls the same script: `make all`, `make test`, `make build`. `./hack/make.sh speaker` is the opt-in sherpa build (`output/daywire-speaker`).
 
 ## Run
 

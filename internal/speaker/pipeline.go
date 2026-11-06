@@ -11,6 +11,15 @@ import (
 // FixtureGapSeconds is the silence between the two speakers in the demo mix.
 const FixtureGapSeconds = 0.5
 
+const (
+	// FixtureEnroll is the LibriSpeech utterance stored as the owner.
+	FixtureEnroll = "librispeech-6930-75918-0000.wav"
+	// FixtureOwner is a second utterance of that reader, held out of enrollment.
+	FixtureOwner = "librispeech-6930-75918-0001.wav"
+	// FixtureOther is a different LibriSpeech reader.
+	FixtureOther = "librispeech-1320-122617-0000.wav"
+)
+
 const minEmbedSeconds = 0.5
 
 // Turn is one diarized segment with an owner decision.
@@ -37,20 +46,20 @@ type DemoClip struct {
 	OtherStart float64
 }
 
-// LoadDemo reads the three committed fixtures and builds the mixed clip:
-// the second utterance of speaker 1, silence, then speaker 2.
-// Enrollment is the first utterance of speaker 1, which is not copied into
+// LoadDemo reads the three LibriSpeech fixtures and builds the mixed clip:
+// the second utterance of reader 6930, silence, then reader 1320.
+// Enrollment is the first utterance of reader 6930, which is not copied into
 // the mix.
 func LoadDemo(ctx context.Context, fixtureDir string) (DemoClip, error) {
-	enrollRate, enroll, err := ReadWAV(ctx, fixturePath(fixtureDir, "speaker1_a_en_16k.wav"))
+	enrollRate, enroll, err := ReadWAV(ctx, fixturePath(fixtureDir, FixtureEnroll))
 	if err != nil {
 		return DemoClip{}, err
 	}
-	ownerRate, owner, err := ReadWAV(ctx, fixturePath(fixtureDir, "speaker1_b_en_16k.wav"))
+	ownerRate, owner, err := ReadWAV(ctx, fixturePath(fixtureDir, FixtureOwner))
 	if err != nil {
 		return DemoClip{}, err
 	}
-	otherRate, other, err := ReadWAV(ctx, fixturePath(fixtureDir, "speaker2_a_en_16k.wav"))
+	otherRate, other, err := ReadWAV(ctx, fixturePath(fixtureDir, FixtureOther))
 	if err != nil {
 		return DemoClip{}, err
 	}

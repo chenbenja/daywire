@@ -50,6 +50,19 @@ func TestProfileRoundTrip(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotEnrolled)
 }
 
+func TestProfileAADDoesNotMatchEventStore(t *testing.T) {
+	t.Parallel()
+	storeColumns := []string{"summary", "title", "message"}
+	ids := []string{"owner", "seed-commitment-1", "speaker.owner"}
+	for _, id := range ids {
+		got := profileAAD(id)
+		require.Equal(t, crypt.AAD(id, "speaker.embedding"), got)
+		for _, column := range storeColumns {
+			require.NotEqual(t, crypt.AAD(id, column), got)
+		}
+	}
+}
+
 func TestValidSpeakerID(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

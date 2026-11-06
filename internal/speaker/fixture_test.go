@@ -16,9 +16,9 @@ func TestFixtureChecksums(t *testing.T) {
 		name string
 		sha  string
 	}{
-		{name: "speaker1_a_en_16k.wav", sha: "cb35bff3dac9aec36e259461fecae1e1bc2ec029615f30713111cd598993676c"},
-		{name: "speaker1_b_en_16k.wav", sha: "d7daff767e13d9a2187b676d958065121cd5e26da046d65cd9604e91a87525a2"},
-		{name: "speaker2_a_en_16k.wav", sha: "a723c134978a17fe12ca2374d0281a8003a56fa44ff9d2249a08791714983362"},
+		{name: FixtureEnroll, sha: "746c756a0b42872638c5f4bb5a8e282ca113bcdaf786bc54591d745dbed96f47"},
+		{name: FixtureOwner, sha: "6d9736c06b09ac23c50a668047f430e157edf980e79629a65d0841cd195927a8"},
+		{name: FixtureOther, sha: "1a50ccdc40469ef16df72473e4cf7502cf36afcb550b75d80d6f923ca866d955"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

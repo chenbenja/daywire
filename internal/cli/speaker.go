@@ -33,7 +33,7 @@ func speakerCommand(logger *slog.Logger) *cli.Command {
 			},
 			{
 				Name:  "demo",
-				Usage: "enroll the public speaker-1 clip and label that voice in a two-speaker mix",
+				Usage: "enroll a LibriSpeech clip and label that reader in a two-speaker mix",
 				Flags: append(speakerFileFlags(false), speakersFlag(), &cli.StringFlag{
 					Name:  "fixture-dir",
 					Usage: "directory of the committed public wavs (default internal/speaker/testdata)",

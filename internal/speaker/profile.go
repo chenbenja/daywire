@@ -134,6 +134,16 @@ func profilePaths(dataDir, id string) (dir, path string, err error) {
 	return dir, path, nil
 }
 
+// profileAAD binds an embedding to the speaker spike.
+//
+// The event store seals with columns summary, title, and message. This column
+// is speaker.embedding. Identifiers accepted by either package cannot contain
+// a NUL, and AAD is id, a NUL, then the column, so the two ciphertexts cannot
+// match.
+func profileAAD(id string) []byte {
+	return crypt.AAD(id, "speaker.embedding")
+}
+
 func sealProfile(id string, vec []float32, key []byte) ([]byte, error) {
 	if err := checkEmbedding(vec); err != nil {
 		return nil, err
@@ -146,7 +156,7 @@ func sealProfile(id string, vec []float32, key []byte) ([]byte, error) {
 	for i, v := range vec {
 		binary.LittleEndian.PutUint32(plain[i*4:], math.Float32bits(v))
 	}
-	nonce, ct, err := box.Seal(crypt.AAD(id, "embedding"), plain)
+	nonce, ct, err := box.Seal(profileAAD(id), plain)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +192,7 @@ func openProfile(id string, body, key []byte) ([]float32, error) {
 	if err != nil {
 		return nil, err
 	}
-	plain, err := box.Open(crypt.AAD(id, "embedding"), nonce, ct)
+	plain, err := box.Open(profileAAD(id), nonce, ct)
 	if err != nil {
 		return nil, fmt.Errorf("open speaker profile: %w", err)
 	}

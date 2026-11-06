@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ErrEngineUnavailable means this build cannot run local speaker models.
@@ -39,7 +40,7 @@ func NewEngine(ctx context.Context, modelDir string, logger *slog.Logger) (Engin
 		return nil, err
 	}
 	if !sherpaAvailable {
-		return nil, fmt.Errorf("rebuild with cgo to link sherpa-onnx: %w", ErrEngineUnavailable)
+		return nil, fmt.Errorf("build with -tags speaker (cgo) to link sherpa-onnx: %w", ErrEngineUnavailable)
 	}
 	if modelDir == "" {
 		var err error
@@ -83,14 +84,32 @@ func moduleRoot() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return findDaywireRoot(dir)
+}
+
+// findDaywireRoot walks parents until it finds this module.
+// Another project's go.mod is not a Daywire checkout.
+func findDaywireRoot(dir string) (string, error) {
 	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+		if err == nil && daywireModule(data) {
 			return dir, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "", fmt.Errorf("go.mod not found")
+			return "", fmt.Errorf("daywire module not found")
 		}
 		dir = parent
 	}
+}
+
+func daywireModule(data []byte) bool {
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+		return line == "module github.com/chenbenja/daywire" || strings.HasPrefix(line, "module github.com/chenbenja/daywire ")
+	}
+	return false
 }

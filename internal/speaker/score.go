@@ -6,8 +6,8 @@ import (
 )
 
 // DefaultOwnerMinScore is the cosine similarity that labels a cluster as the
-// enrolled owner. On the public English fixtures with NeMo speakernet, the
-// owner cluster scores about 0.76 and the other speaker about 0.18.
+// enrolled owner. On the LibriSpeech fixtures with NeMo speakernet, the owner
+// cluster scores about 0.73 and the other reader about 0.24.
 const DefaultOwnerMinScore = 0.45
 
 // Cosine returns the cosine similarity of two embeddings.

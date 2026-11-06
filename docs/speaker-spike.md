@@ -7,40 +7,32 @@ This is a laptop check that enrollment can be matched to a speaker cluster. It i
 1. Embed a short public WAV and store that vector under the data directory, encrypted with the same AES-256-GCM key as the event store.
 2. Diarize a two-speaker clip on CPU and label the cluster that matches the enrollment as `owner`.
 
-The engine is [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) v2.0.1 through its Go bindings (`github.com/k2-fsa/sherpa-onnx-go/v2`). Those bindings link the project's prebuilt `libsherpa-onnx-c-api` and `libonnxruntime` with an rpath into the module cache, so the spike does not compile sherpa or shell out to Python. A later phone build can keep the same enroll-then-match shape.
+The engine is [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) v2.0.1 through its Go bindings (`github.com/k2-fsa/sherpa-onnx-go/v2`). Those bindings link the project's prebuilt `libsherpa-onnx-c-api` and `libonnxruntime`. The embedding model is NVIDIA NeMo `speakerverification_speakernet` (256 dimensions). Segmentation is pyannote segmentation 3.0. On the LibriSpeech fixtures below, the enrolled reader scores about 0.73 and the other reader about 0.24.
 
-The embedding model is NVIDIA NeMo `speakerverification_speakernet` (256 dimensions, English). The segmentation model is pyannote segmentation 3.0. CAM++ was tried first: on these clips the same-speaker score was about 0.20 and a short-gap mix stayed one cluster. Speakernet scores the same speaker at about 0.76 and the other speaker at about 0.18, and the mix splits. The larger Chinese ERes2Net also worked; speakernet is the smaller English model.
+## Two binaries
 
-## Run
+`./hack/make.sh all` builds `output/daywire` with `CGO_ENABLED=0`. That is the Week 1 server. It does not link sherpa or onnxruntime, so `serve` and `doctor` do not depend on the module cache. `daywire speaker` in that binary exits with `speaker engine unavailable`.
 
-From the repository root, after `./hack/make.sh all` (cgo on, which is the default when gcc is installed):
-
-```bash
-./output/daywire speaker demo --data-dir /tmp/daywire-speaker
-```
-
-That enrolls `speaker1_a_en_16k.wav` and labels a mix of `speaker1_b_en_16k.wav`, half a second of silence, and `speaker2_a_en_16k.wav`. The log lines `enroll succeeded` and `label=owner` are the result. The owner turns are the first speaker.
-
-The same steps with your own 16 kHz mono PCM files:
+The spike is opt-in:
 
 ```bash
-./output/daywire speaker enroll --data-dir /tmp/daywire-speaker --wav enroll.wav
-./output/daywire speaker label --data-dir /tmp/daywire-speaker --wav mixed.wav
+./hack/make.sh speaker
+./output/daywire-speaker speaker demo --data-dir /tmp/daywire-speaker
 ```
 
-`--speakers 2` forces two clusters. The default `0` uses sherpa's cosine-distance threshold (0.5). `--id` defaults to `owner`.
+`hack/make.sh speaker` runs `go test -tags speaker` and writes `output/daywire-speaker`. That binary links the native libraries with an rpath into the Go module cache, so run it on the machine that built it. Do not use it as the long-running MCP server. After `go clean -modcache` it will not start until it is rebuilt.
 
-The first run downloads two models into `output/speaker-models/` (or `DAYWIRE_SPEAKER_MODEL_DIR`, or `~/.cache/daywire/speaker` when not in a checkout). The files are pinned by SHA-256 in `internal/speaker/models.go`. They are not committed. If the cache is empty and the download fails, the command exits with `speaker models unavailable`. `go test` skips that case the same way and fails if enrollment or the owner label is wrong once the models are present.
+`speaker enroll` and `speaker label` on that binary take a 16 kHz mono PCM wav. `--speakers 2` forces two clusters. The default `0` uses sherpa's cosine-distance threshold (0.5). `--id` defaults to `owner`.
 
-`output/daywire speaker` finds the shared libraries via the rpath recorded at `go build` time. Run the binary on the machine that built it.
+The first spike run downloads two models into `output/speaker-models/` when the working directory is this module (`github.com/chenbenja/daywire`). Another checkout is left alone; the cache is then `$XDG_CACHE_HOME/daywire/speaker` or `~/.cache/daywire/speaker`. `DAYWIRE_SPEAKER_MODEL_DIR` overrides both. The files are pinned by SHA-256 in `internal/speaker/models.go` and are not committed. If the cache is empty and the download fails, the command exits with `speaker models unavailable`.
 
 ## What stays local
 
-- The embedding file is `<data-dir>/speakers/<id>.emb`, mode `0600`, directory mode `0700`. The vector is ciphertext. The id is not.
+- The embedding file is `<data-dir>/speakers/<id>.emb`, mode `0600`, directory mode `0700`. The vector is ciphertext. The authenticated data is the speaker id and the column `speaker.embedding`, which is not an event or nudge column.
 - Diarization logs speaker ids, times, and cosine scores. It does not log the vector or the samples.
 - No event row is written. `events.db` is not opened.
 - Model download is a GET of the two pinned sherpa-onnx release URLs. Nothing is posted.
 
 ## Fixtures
 
-See [internal/speaker/testdata/README.md](../internal/speaker/testdata/README.md).
+LibriSpeech test-clean, CC BY 4.0. See [internal/speaker/testdata/README.md](../internal/speaker/testdata/README.md).

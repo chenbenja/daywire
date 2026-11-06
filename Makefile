@@ -1,4 +1,4 @@
-.PHONY: all fmt fmt-write vet test build
+.PHONY: all fmt fmt-write vet test build speaker
 
 all:
 	./hack/make.sh all
@@ -17,3 +17,6 @@ test:
 
 build:
 	./hack/make.sh build
+
+speaker:
+	./hack/make.sh speaker

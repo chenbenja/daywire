@@ -32,14 +32,18 @@ func TestSpeakerEnrollLabelAndDemo(t *testing.T) {
 	require.NoError(t, err)
 	mix := filepath.Join(t.TempDir(), "mix.wav")
 	require.NoError(t, speaker.WriteWAV(ctx, mix, clip.SampleRate, clip.Mixed))
-	enroll := filepath.Join("..", "speaker", "testdata", "speaker1_a_en_16k.wav")
+	enroll := filepath.Join("..", "speaker", "testdata", speaker.FixtureEnroll)
 
 	err = cli.Run(ctx, []string{
 		"daywire", "speaker", "enroll",
 		"--data-dir", data,
 		"--wav", enroll,
 	}, logger)
-	if errors.Is(err, speaker.ErrModelsUnavailable) || errors.Is(err, speaker.ErrEngineUnavailable) {
+	if errors.Is(err, speaker.ErrEngineUnavailable) {
+		require.ErrorIs(t, err, speaker.ErrEngineUnavailable)
+		return
+	}
+	if errors.Is(err, speaker.ErrModelsUnavailable) {
 		t.Skip(err.Error())
 	}
 	require.NoError(t, err)
