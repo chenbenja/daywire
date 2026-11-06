@@ -54,8 +54,12 @@ all)
 	mkdir -p output
 	CGO_ENABLED=0 go build -o output/daywire ./cmd/daywire
 	;;
+android)
+	# Separate from `all`: the AAR bind needs the Android SDK and gomobile.
+	"$root/hack/android-bind.sh"
+	;;
 *)
-	echo "usage: $0 {fmt|fmt-write|vet|test|build|speaker|all}" >&2
+	echo "usage: $0 {fmt|fmt-write|vet|test|build|speaker|android|all}" >&2
 	exit 2
 	;;
 esac

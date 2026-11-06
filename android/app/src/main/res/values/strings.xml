@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Daywire</string>
+    <string name="tagline">Redacted events stay on this phone.</string>
+    <string name="status_ready">Ready.</string>
+    <string name="action_failed">That did not work.</string>
+
+    <string name="section_store">Store</string>
+    <string name="store_help">The encrypted event database is in this app\'s private storage. This screen does not open a network port.</string>
+    <string name="store_open">Store is open on this phone.</string>
+    <string name="store_closed">Store did not open: %1$s</string>
+
+    <string name="section_notifications">Notifications</string>
+    <string name="notification_help">Access stays off until you turn it on in system settings. The allow-list starts empty. For an allowed app, Daywire stores a note that the app posted a notification, plus the platform category when it is a known one. The title and the text are not stored.</string>
+    <string name="open_listener_settings">Turn on notification access</string>
+    <string name="pick_apps">Choose allowed apps</string>
+    <string name="listener_on">Notification access is on.</string>
+    <string name="listener_off">Notification access is off.</string>
+    <string name="allow_empty">Allowed apps: none.</string>
+    <string name="allow_count">Allowed apps: %1$d.</string>
+    <string name="allow_title">Allowed apps</string>
+    <string name="allow_help">Checked apps can become notes. Nothing is captured from the others. Apps without a home-screen icon can be added by package name.</string>
+    <string name="allow_filter">Filter</string>
+    <string name="allow_package">Package name</string>
+    <string name="allow_add">Add</string>
+    <string name="allow_save">Save</string>
+    <string name="allow_loading">Loading apps…</string>
+    <string name="allow_none">No apps match.</string>
+    <string name="allow_bad_package">That does not look like an Android package name.</string>
+    <string name="allow_saved">Allow-list saved.</string>
+
+    <string name="section_location">Location</string>
+    <string name="location_help">Off until you tap the button. Daywire asks for approximate location, takes one fix, and stores a coarse grid. It does not track in the background, and it does not log precise coordinates.</string>
+    <string name="record_visit">Record a coarse visit</string>
+    <string name="location_permission_denied">Approximate location was not granted, so no visit was stored.</string>
+    <string name="location_off">Location is turned off in system settings, so no visit was stored.</string>
+    <string name="location_missing">No approximate location yet, so no visit was stored.</string>
+    <string name="location_stored">Coarse visit stored.</string>
+
+    <string name="section_folder">Folder</string>
+    <string name="folder_help">Pick a folder with the system picker. This is the hook for a call-recording folder later. Names of the top level are listed here. The files are not opened. An ordinary app on Android 10 and newer cannot record both sides of a phone call; the phone\'s own recorder has to write the files.</string>
+    <string name="pick_folder">Pick a folder</string>
+    <string name="forget_folder">Forget folder</string>
+    <string name="folder_none">No folder picked.</string>
+    <string name="folder_empty">The folder has nothing at the top level.</string>
+    <string name="folder_capped">Showing the first 200 names.</string>
+    <string name="folder_picked">Folder picked. Names only.</string>
+    <string name="folder_forgotten">Folder forgotten. The files were not deleted.</string>
+    <string name="folder_unavailable">That folder is no longer readable.</string>
+
+    <string name="section_nudge">Nudge</string>
+    <string name="nudge_help">Shows a notification from this app and records it in the store. ntfy is not used.</string>
+    <string name="show_nudge">Show a sample nudge</string>
+    <string name="nudge_shown">Sample nudge shown on this phone.</string>
+    <string name="nudge_not_shown">Notifications are off, so the nudge was recorded as not shown.</string>
+    <string name="nudge_permission_denied">Notification permission was not granted. The nudge was recorded as not shown.</string>
+
+    <string name="section_events">Recent events</string>
+    <string name="insert_note">Insert a synthetic note</string>
+    <string name="refresh">Refresh</string>
+    <string name="events_empty">No events yet.</string>
+    <string name="events_unavailable">Events could not be read.</string>
+    <string name="note_stored">Synthetic note stored.</string>
+</resources>

@@ -47,8 +47,21 @@ CREATE TABLE IF NOT EXISTS nudges (
 // MaxLimit is the largest page the store will return.
 const MaxLimit = 200
 
+const (
+	// ChannelLog is the Week 1 fallback that writes the nudge to the process log.
+	ChannelLog = "log"
+	// ChannelNtfy is the Week 1 ntfy delivery.
+	ChannelNtfy = "ntfy"
+	// ChannelLocal is an on-device notification record. Inserting it does not
+	// contact ntfy or any other network.
+	ChannelLocal = "local"
+)
+
 // ErrNotFound is returned when an event id is absent.
 var ErrNotFound = errors.New("event not found")
+
+// ErrNudgeNotFound is returned when a nudge id is absent.
+var ErrNudgeNotFound = errors.New("nudge not found")
 
 // Store is an append-only event database.
 type Store struct {
@@ -278,7 +291,8 @@ func (s *Store) ListSince(ctx context.Context, c Cursor, limit int) ([]event.Eve
 }
 
 // InsertNudge appends a delivery record. Detail is stored in the clear and
-// must already be free of title and message text.
+// must already be free of title and message text. Channel is one of
+// ChannelLog, ChannelNtfy, or ChannelLocal.
 func (s *Store) InsertNudge(ctx context.Context, n Nudge) error {
 	if err := validateNudge(n); err != nil {
 		return err
@@ -318,12 +332,50 @@ func (s *Store) InsertNudge(ctx context.Context, n Nudge) error {
 	return nil
 }
 
+// GetNudge returns the delivery record with id.
+func (s *Store) GetNudge(ctx context.Context, id string) (Nudge, error) {
+	if !event.ValidID(id) {
+		return Nudge{}, fmt.Errorf("invalid nudge id")
+	}
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, created_at, channel, delivered, detail,
+			title_nonce, title_ct, message_nonce, message_ct
+		FROM nudges WHERE id = ?`, id)
+	var n Nudge
+	var created int64
+	var delivered int
+	var titleNonce, titleCT, msgNonce, msgCT []byte
+	err := row.Scan(
+		&n.ID, &created, &n.Channel, &delivered, &n.Detail,
+		&titleNonce, &titleCT, &msgNonce, &msgCT,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Nudge{}, ErrNudgeNotFound
+		}
+		return Nudge{}, fmt.Errorf("read nudge: %w", err)
+	}
+	n.CreatedAt = time.UnixMicro(created).UTC()
+	n.Delivered = delivered != 0
+	title, err := s.box.Open(crypt.AAD(n.ID, "title"), titleNonce, titleCT)
+	if err != nil {
+		return Nudge{}, fmt.Errorf("read nudge %s: %w", n.ID, err)
+	}
+	message, err := s.box.Open(crypt.AAD(n.ID, "message"), msgNonce, msgCT)
+	if err != nil {
+		return Nudge{}, fmt.Errorf("read nudge %s: %w", n.ID, err)
+	}
+	n.Title = string(title)
+	n.Message = string(message)
+	return n, nil
+}
+
 func validateNudge(n Nudge) error {
 	if !event.ValidID(n.ID) {
 		return fmt.Errorf("invalid nudge id")
 	}
 	switch n.Channel {
-	case "log", "ntfy":
+	case ChannelLog, ChannelNtfy, ChannelLocal:
 	default:
 		return fmt.Errorf("invalid nudge channel")
 	}

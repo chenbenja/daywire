@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Daywire is a phone-first life-context bridge. Week 1 in this repository is a localhost Go process: redacted events, an encrypted SQLite store, a loopback MCP server, ntfy nudges, and `daywire doctor`.
+Daywire is a phone-first life-context bridge. Week 1 is a localhost Go process: redacted events, an encrypted SQLite store, a loopback MCP server, ntfy nudges, and `daywire doctor`. Week 2 is a thin Android shell that uses that store on the phone. The laptop speaker-id spike stays behind the `speaker` build tag and is not linked into the APK.
 
 These conventions follow the shape of Chen's private Go services (in particular the sanit-internal layout and review habits). They are adapted for Daywire. Do not copy Sanit product code into this repo.
 
@@ -11,7 +11,8 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 ## Layout
 
 - `cmd/daywire/` is a thin `main`. Flag parsing and subcommands live in `internal/cli`.
-- Product code lives under `internal/`. One concern per package: `event`, `crypt`, `config`, `store`, `nudge`, `seed`, `service`, `server`, `doctor`, `speaker`. `speaker` is the laptop enroll-then-owner spike. The sherpa engine is behind the `speaker` build tag, so the default `daywire` binary stays pure Go. The spike does not add an event field or a network bind.
+- Product code lives under `internal/`. One concern per package: `event`, `crypt`, `config`, `store`, `nudge`, `seed`, `service`, `server`, `doctor`, `speaker`, `mobile`. `speaker` is the laptop enroll-then-owner spike. The sherpa engine is behind the `speaker` build tag, so the default `daywire` binary stays pure Go. The spike does not add an event field or a network bind. `internal/mobile` is the on-device store API. `mobile/` is the gomobile bind surface, because the generated JNI wrapper cannot import an `internal` package.
+- `android/` is the Week 2 Kotlin shell. `./hack/make.sh all` does not build it. `./hack/android-bind.sh` writes `android/app/libs/daywire.aar` and must not pass `-tags speaker`.
 - `hack/make.sh` is the build entry. The Makefile only calls it.
 - Binaries go to `output/`. Do not commit `output/`.
 
@@ -33,7 +34,8 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 - Assistants see redacted semantic events (`commitment`, `ask`, `visit`, `note`) over MCP. They do not receive raw call audio.
 - Do not add an audio upload, an attachment route, or a field whose purpose is a recording.
 - Bind MCP and the curl routes to loopback only. Reject other addresses in config validation before `net.Listen`. Reject a request whose Host header is not `localhost` or a loopback IP.
-- Default nudge transport is ntfy. Do not add Telegram as the default.
+- Default nudge transport on the laptop is ntfy. Do not add Telegram as the default. The phone shell uses NotificationCompat and does not require ntfy.
+- The Android shell asks at runtime for notification access and coarse location. Both default off. The notification allow-list starts empty. Do not store or log raw notification text, and do not log precise coordinates.
 
 ## Store
 
@@ -52,4 +54,4 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 
 ## Out of scope unless a human asks
 
-Android / Kotlin / gomobile, Telegram-as-default, Play Store, FCM, Hebrew STT, on-device speech models, and writing licence files.
+Telegram-as-default, Play Store listing, FCM, Hebrew STT, on-device speech models in the APK, voiceprint enrollment, and writing licence files. Do not link sherpa, onnxruntime, or the `speaker` build tag into `android/`.
