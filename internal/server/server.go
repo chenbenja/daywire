@@ -111,7 +111,7 @@ func NewMCP(svc *service.Service, logger *slog.Logger) *mcp.Server {
 		Title:   "Daywire",
 		Version: buildinfo.Version,
 	}, &mcp.ServerOptions{
-		Instructions: "Daywire returns redacted semantic events only. There is no call audio and no raw message body. Use query_events, subscribe (poll), and propose_nudge.",
+		Instructions: "Daywire returns redacted semantic events only. There is no call audio, no raw message body, and no speech transcript. Use query_events, subscribe (poll), and propose_nudge.",
 		Logger:       logger,
 	})
 	h := handlers{svc: svc}

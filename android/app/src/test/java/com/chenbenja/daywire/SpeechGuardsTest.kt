@@ -64,6 +64,29 @@ class SpeechGuardsTest {
     }
 
     @Test
+    fun pcmWavKeepsTheMostNegativeSample() {
+        PcmWav(ByteArrayInputStream(wav(shortArrayOf(Short.MIN_VALUE)))).use { reader ->
+            val samples = reader.readSamples(1)
+            assertEquals(1, samples.size)
+            assertEquals(-1f, samples[0], 1e-6f)
+        }
+    }
+
+    @Test
+    fun packEmbeddingIsLittleEndianFloat32() {
+        val packed = packEmbedding(floatArrayOf(1f, -0.5f))
+        assertEquals(8, packed.size)
+        assertEquals(0x00.toByte(), packed[0])
+        assertEquals(0x00.toByte(), packed[1])
+        assertEquals(0x80.toByte(), packed[2])
+        assertEquals(0x3f.toByte(), packed[3])
+        assertEquals(0x00.toByte(), packed[4])
+        assertEquals(0x00.toByte(), packed[5])
+        assertEquals(0x00.toByte(), packed[6])
+        assertEquals(0xbf.toByte(), packed[7])
+    }
+
+    @Test
     fun pcmWavRejectsOtherFormats() {
         assertThrows(SpeechInputException::class.java) {
             PcmWav(ByteArrayInputStream(wav(shortArrayOf(0), rate = 8000))).use { }

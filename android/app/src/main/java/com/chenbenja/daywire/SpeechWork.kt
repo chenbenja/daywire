@@ -95,7 +95,7 @@ internal object SpeechWork {
                 }
                 openSpeechModels(context, "").use { models ->
                     val vec = models.embed(samples)
-                    DaywireCore.call(context) { core -> core.saveOwnerVoiceprint(vec) }
+                    DaywireCore.call(context) { core -> core.saveOwnerVoiceprint(packEmbedding(vec)) }
                 }
                 Trace.info("speech enroll ok")
                 return if (more) {
@@ -162,7 +162,7 @@ internal object SpeechWork {
                                 val label = if (embedding == null) {
                                     "unknown"
                                 } else {
-                                    DaywireCore.call(context) { core -> core.labelOwner(embedding) }
+                                    DaywireCore.call(context) { core -> core.labelOwner(packEmbedding(embedding)) }
                                 }
                                 val whenMs = started + ((base + start) * 1000L / SPEECH_SAMPLE_RATE)
                                 DaywireCore.call(context) { core ->

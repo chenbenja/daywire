@@ -142,9 +142,10 @@ func (c *Core) InsertCoarseVisit(latitude, longitude float64, occurredUnixMilli 
 	return c.insert(event.TypeVisit, visitSourceID, summary, occurredUnixMilli)
 }
 
-// ListEventsJSON returns redacted events as a JSON array, newest occurred_at
-// first. eventType empty matches every type. limit 0 uses 50. The maximum is
-// the store maximum.
+// ListEventsJSON returns events as a JSON array, newest occurred_at first.
+// eventType empty matches every type, including speech turns for the phone
+// UI. limit 0 uses 50. The maximum is the store maximum. This is not the
+// assistant query path.
 func (c *Core) ListEventsJSON(eventType string, limit int) (string, error) {
 	if err := c.ready(); err != nil {
 		return "", err

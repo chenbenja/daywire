@@ -2,20 +2,28 @@ package mobile
 
 import (
 	"context"
+	"encoding/binary"
+	"fmt"
+	"math"
 
 	"github.com/chenbenja/daywire/internal/event"
 	"github.com/chenbenja/daywire/internal/speech"
 	"github.com/chenbenja/daywire/internal/voiceprint"
 )
 
-// SaveOwnerVoiceprint encrypts vec and writes speakers/owner.emb next to the
-// database. A later call with the same phone replaces the file. The vector
-// is not logged.
-func (c *Core) SaveOwnerVoiceprint(vec []float32) error {
+// SaveOwnerVoiceprint encrypts the embedding and writes speakers/owner.emb
+// next to the database. packed is little-endian float32 bits. A later call
+// replaces the file. The vector is not logged. The parameter is []byte
+// because gobind does not generate methods that take []float32.
+func (c *Core) SaveOwnerVoiceprint(packed []byte) error {
 	if err := c.ready(); err != nil {
 		return err
 	}
-	err := c.with(func(ctx context.Context) error {
+	vec, err := unpackEmbedding(packed)
+	if err != nil {
+		return err
+	}
+	err = c.with(func(ctx context.Context) error {
 		return voiceprint.Save(ctx, c.dataDir, c.key, voiceprint.OwnerID, vec)
 	})
 	if err != nil {
@@ -59,14 +67,19 @@ func (c *Core) OwnerEnrolled() (bool, error) {
 	return enrolled, nil
 }
 
-// LabelOwner scores vec against the enrolled voice. The result is owner,
-// other, or unknown. The score and the vector are not logged.
-func (c *Core) LabelOwner(vec []float32) (string, error) {
+// LabelOwner scores packed against the enrolled voice. packed is
+// little-endian float32 bits. The result is owner, other, or unknown.
+// The score and the vector are not logged.
+func (c *Core) LabelOwner(packed []byte) (string, error) {
 	if err := c.ready(); err != nil {
 		return "", err
 	}
+	vec, err := unpackEmbedding(packed)
+	if err != nil {
+		return "", err
+	}
 	var label string
-	err := c.with(func(ctx context.Context) error {
+	err = c.with(func(ctx context.Context) error {
 		var qerr error
 		label, qerr = voiceprint.Match(ctx, c.dataDir, c.key, voiceprint.OwnerID, vec)
 		return qerr
@@ -77,10 +90,11 @@ func (c *Core) LabelOwner(vec []float32) (string, error) {
 	return label, nil
 }
 
-// InsertSpeechTurn stores one speaker turn as a note. language is en or he.
-// label is owner, other, or unknown. text is the transcript. Control
-// characters are stripped and the summary is capped. The source id is
-// android:speech. This method does not take a file path, audio, or an embedding.
+// InsertSpeechTurn stores one speaker turn as a speech event, not a note.
+// language is en or he. label is owner, other, or unknown. text is the
+// transcript. Control characters are stripped and the summary is capped.
+// The source id is android:speech. This method does not take a file path,
+// audio, or an embedding. query_events and subscribe do not return the row.
 func (c *Core) InsertSpeechTurn(language, label, text string, occurredUnixMilli int64) (string, error) {
 	if err := c.ready(); err != nil {
 		return "", err
@@ -89,10 +103,23 @@ func (c *Core) InsertSpeechTurn(language, label, text string, occurredUnixMilli 
 	if err != nil {
 		return "", err
 	}
-	id, err := c.insert(event.TypeNote, speech.SourceID, summary, occurredUnixMilli)
+	id, err := c.insert(event.TypeSpeech, speech.SourceID, summary, occurredUnixMilli)
 	if err != nil {
 		return "", err
 	}
 	c.log.Info("speech turn stored", "event_id", id, "language", language, "label", label)
 	return id, nil
+}
+
+// unpackEmbedding reads little-endian float32 bits. The error does not quote
+// the bytes.
+func unpackEmbedding(packed []byte) ([]float32, error) {
+	if len(packed) == 0 || len(packed)%4 != 0 || len(packed) > 4096*4 {
+		return nil, fmt.Errorf("invalid embedding")
+	}
+	out := make([]float32, len(packed)/4)
+	for i := range out {
+		out[i] = math.Float32frombits(binary.LittleEndian.Uint32(packed[i*4:]))
+	}
+	return out, nil
 }

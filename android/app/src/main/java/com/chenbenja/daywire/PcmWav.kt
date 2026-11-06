@@ -84,7 +84,7 @@ internal class PcmWav(private val input: InputStream) : Closeable {
         var i = 0
         while (i < out.size) {
             val lo = bytes[i * 2].toInt() and 0xff
-            val hi = bytes[i * 2 + 1].toInt()
+            val hi = bytes[i * 2 + 1].toInt() and 0xff
             var v = (hi shl 8) or lo
             if (v and 0x8000 != 0) {
                 v -= 0x10000

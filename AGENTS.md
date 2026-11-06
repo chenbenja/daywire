@@ -31,7 +31,7 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 
 ## Privacy boundary
 
-- Assistants see redacted semantic events (`commitment`, `ask`, `visit`, `note`) over MCP. They do not receive raw call audio. A speech turn is a `note` whose summary is a speaker label plus transcript text. The source id is `android:speech`. It is not a file path.
+- Assistants see redacted semantic events (`commitment`, `ask`, `visit`, `note`) over MCP. They do not receive raw call audio or speech transcripts. A speech turn is type `speech`, source id `android:speech`, with no file path. The phone UI can list it. `query_events` and subscribe omit it.
 - Do not add an audio upload, an attachment route, or a field whose purpose is a recording.
 - Bind MCP and the curl routes to loopback only. Reject other addresses in config validation before `net.Listen`. Reject a request whose Host header is not `localhost` or a loopback IP.
 - Default nudge transport on the laptop is ntfy. Do not add Telegram as the default. The phone shell uses NotificationCompat and does not require ntfy.

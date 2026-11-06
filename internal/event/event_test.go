@@ -20,6 +20,7 @@ func TestTypeValid(t *testing.T) {
 		{event.TypeAsk, true},
 		{event.TypeVisit, true},
 		{event.TypeNote, true},
+		{event.TypeSpeech, true},
 		{"audio", false},
 		{"", false},
 	}
@@ -29,6 +30,14 @@ func TestTypeValid(t *testing.T) {
 			require.Equal(t, tc.want, tc.in.Valid())
 		})
 	}
+}
+
+func TestAssistantVisibleOmitsSpeech(t *testing.T) {
+	t.Parallel()
+	require.True(t, event.TypeNote.AssistantVisible())
+	require.True(t, event.TypeVisit.AssistantVisible())
+	require.False(t, event.TypeSpeech.AssistantVisible())
+	require.False(t, event.Type("audio").AssistantVisible())
 }
 
 func TestValidate(t *testing.T) {

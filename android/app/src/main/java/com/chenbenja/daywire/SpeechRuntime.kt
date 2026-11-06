@@ -45,7 +45,12 @@ private fun safeSpeechMessage(message: String?): Boolean {
 
 private const val ENGINE = "com.chenbenja.daywire.speech.SherpaSpeechEngine"
 
-internal interface SpeechModels : Closeable {
+/**
+ * On-device model session. Public so the speech source set can return it
+ * from [com.chenbenja.daywire.speech.SherpaSpeechEngine.open]. The shell
+ * still opens that class by reflection, and only when the archive is present.
+ */
+interface SpeechModels : Closeable {
     fun embed(samples: FloatArray): FloatArray
 
     fun hearWindow(

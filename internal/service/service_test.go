@@ -63,6 +63,45 @@ func TestSubscribeWaitsForInsert(t *testing.T) {
 	require.Equal(t, out.Cursor, next.Cursor)
 }
 
+func TestQueryAndSubscribeOmitSpeech(t *testing.T) {
+	cfg := testutil.LoadConfig(t)
+	ctx := testutil.Context(t)
+	st := testutil.OpenStore(t, cfg)
+	svc := service.New(st, nudge.New("", "", testutil.Logger(t)), testutil.Logger(t))
+	when := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, st.InsertEvent(ctx, event.Event{
+		ID:         "phone-note",
+		Type:       event.TypeNote,
+		SourceID:   "android:synthetic",
+		OccurredAt: when,
+		CreatedAt:  when,
+		Summary:    "Note: synthetic check from the Daywire shell.",
+	}))
+	require.NoError(t, st.InsertEvent(ctx, event.Event{
+		ID:         "phone-speech",
+		Type:       event.TypeSpeech,
+		SourceID:   "android:speech",
+		OccurredAt: when.Add(time.Minute),
+		CreatedAt:  when.Add(time.Minute),
+		Summary:    "en owner: Jane Doe left the spare key",
+	}))
+
+	out, err := svc.Query(ctx, service.QueryInput{Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, out.Events, 1)
+	require.Equal(t, "phone-note", out.Events[0].ID)
+	require.NotContains(t, out.Events[0].Summary, "Jane Doe")
+
+	_, err = svc.Query(ctx, service.QueryInput{Type: "speech"})
+	require.ErrorContains(t, err, "invalid event type")
+
+	polled, err := svc.Subscribe(ctx, service.SubscribeInput{Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, polled.Events, 1)
+	require.Equal(t, "phone-note", polled.Events[0].ID)
+	require.NotContains(t, polled.Events[0].Summary, "Jane Doe")
+}
+
 func TestProposeLogFallback(t *testing.T) {
 	svc := newService(t)
 	out, err := svc.Propose(testutil.Context(t), service.ProposeInput{

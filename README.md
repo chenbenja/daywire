@@ -40,7 +40,7 @@ That build downloads the pinned models into `output/speaker-models/` (gitignored
 
 ## Week 3 on-device speech
 
-The same app enrolls an owner voiceprint from one picked 16 kHz mono PCM WAV, can forget it, and processes another picked file on the phone: 10 second windows, pyannote segmentation, NeMo SpeakerNet, cosine owner/other/unknown, then Moonshine tiny English or the ivrit-ai Hebrew Zipformer. Turns are stored as redacted notes. There is no microphone and no `INTERNET` permission. Models are fetched at build time:
+The same app enrolls an owner voiceprint from one picked 16 kHz mono PCM WAV, can forget it, and processes another picked file on the phone: 10 second windows, pyannote segmentation, NeMo SpeakerNet, cosine owner/other/unknown, then Moonshine tiny English or the ivrit-ai Hebrew Zipformer. Turns are stored as `speech` events the phone can show. Assistants do not receive them. There is no microphone and no `INTERNET` permission. Models are fetched at build time:
 
 ```bash
 ./hack/fetch-speech-models.sh

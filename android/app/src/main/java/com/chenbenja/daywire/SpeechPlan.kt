@@ -61,6 +61,21 @@ internal fun planSpans(nSamples: Int, spanSamples: Int, minTail: Int): List<Samp
     return out
 }
 
+/** Little-endian float32 bits. Gobind accepts this byte slice, not a float array. */
+internal fun packEmbedding(samples: FloatArray): ByteArray {
+    val out = ByteArray(samples.size * 4)
+    var i = 0
+    while (i < samples.size) {
+        val bits = java.lang.Float.floatToRawIntBits(samples[i])
+        out[i * 4] = (bits and 0xff).toByte()
+        out[i * 4 + 1] = (bits ushr 8 and 0xff).toByte()
+        out[i * 4 + 2] = (bits ushr 16 and 0xff).toByte()
+        out[i * 4 + 3] = (bits ushr 24 and 0xff).toByte()
+        i++
+    }
+    return out
+}
+
 internal class SpeechGate {
     private val lock = Any()
     private var busyFlag = false

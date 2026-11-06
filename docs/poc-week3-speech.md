@@ -12,11 +12,11 @@ This is not call recording, not a microphone, and not an on-device LLM. It does 
 |---|---|---|
 | Voiceprint file | `internal/voiceprint` | Same AES-256-GCM file as the laptop spike: `<data-dir>/speakers/owner.emb`, directory `0700`, file `0600`, column `speaker.embedding`. |
 | Turn label | `voiceprint.LabelTurn` | Cosine against that file. At or above 0.45 is `owner`. At or below 0.30 is `other`. The open interval, and a non-finite score, is `unknown`. |
-| Speech note | `internal/speech`, `internal/mobile` | One `note` per turn. Source id `android:speech`. Summary `en owner: …`, `he other: …`, or `en unknown: …`. Control and format characters stripped, summary capped at 1024 bytes. No file path parameter. |
+| Speech turn | `internal/speech`, `internal/mobile` | One `speech` event per turn, not a `note`. Source id `android:speech`. Summary `en owner: …`, `he other: …`, or `en unknown: …`. Control and format characters stripped, summary capped at 1024 bytes. No file path parameter. The phone UI lists it. `query_events` and subscribe do not. |
 | Pipeline | `android/app/src/speech/` | 10 s windows, pyannote segmentation 3.0, NeMo SpeakerNet embed, cosine in Go, then STT. Compiled only when the sherpa-onnx AAR is present. |
 | English STT | Moonshine tiny | About 5 s slices, MIT English model. |
 | Hebrew STT | ivrit-ai Zipformer2 | User-selected. About 1.28 s streaming chunks, then 1.5 s of silence so the last chunk flushes. |
-| UI | main screen | Enroll, forget, process, English or Hebrew, model and enrollment status. Work is off the main thread. Status survives rotation. New notes show in Recent events. |
+| UI | main screen | Enroll, forget, process, English or Hebrew, model and enrollment status. Work is off the main thread. Status survives rotation. New speech turns show in Recent events. |
 
 `./hack/make.sh all` stays `gofmt`, `go vet`, `go test -race`, and `CGO_ENABLED=0` for `output/daywire`. It does not download models and it does not build the APK. `./hack/make.sh speech-models` is the pinned fetch. `./hack/android-bind.sh` still does not pass `-tags speaker` and still rejects sherpa or onnxruntime inside `daywire.aar`.
 
@@ -78,7 +78,7 @@ The Speech card on the main screen:
 3. **Process a file.** Another document picker, not the Week 2 folder list. That list stays names only. Audio is read in 10 second windows, not as one hour-long pass. Processing stops after 10 minutes and says so.
 4. **English or Hebrew.** The choice is explicit. Mixed speech is not auto-routed.
 
-Each stored turn is a `note` with source `android:speech`. Recent events shows it. Logs record the event id, `en` or `he`, the label, and a turn count. They do not record the transcript, the embedding, the samples, or the picked path.
+Each stored turn is a `speech` event with source `android:speech`. Recent events on the phone shows it. `query_events` and subscribe do not return it, including when the type filter is omitted. Logs record the event id, `en` or `he`, the label, and a turn count. They do not record the transcript, the embedding, the samples, or the picked path. The voiceprint crosses the Go bind as little-endian float32 bytes, because gobind does not generate a `[]float32` parameter.
 
 The picker offers audio MIME types. The decoder accepts **16 kHz, mono, 16-bit PCM WAV** only. Anything else fails with "That file is not 16 kHz mono PCM WAV." There is no resampler and no microphone permission.
 
