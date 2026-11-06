@@ -1,3 +1,4 @@
+# Binaries and the speaker-model cache (output/speaker-models/). Do not commit models.
 /output/
 *.db
 *.db-wal

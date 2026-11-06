@@ -11,7 +11,7 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 ## Layout
 
 - `cmd/daywire/` is a thin `main`. Flag parsing and subcommands live in `internal/cli`.
-- Product code lives under `internal/`. One concern per package: `event`, `crypt`, `config`, `store`, `nudge`, `seed`, `service`, `server`, `doctor`.
+- Product code lives under `internal/`. One concern per package: `event`, `crypt`, `config`, `store`, `nudge`, `seed`, `service`, `server`, `doctor`, `speaker`. `speaker` is the laptop enroll-then-owner spike. It does not add an event field or a network bind.
 - `hack/make.sh` is the build entry. The Makefile only calls it.
 - Binaries go to `output/`. Do not commit `output/`.
 

@@ -65,6 +65,7 @@ func Run(ctx context.Context, args []string, logger *slog.Logger) error {
 					return runSeed(ctx, cmd, logger)
 				},
 			},
+			speakerCommand(logger),
 			{
 				Name:  "version",
 				Usage: "print the version",
