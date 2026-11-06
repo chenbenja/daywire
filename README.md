@@ -2,16 +2,121 @@
 
 **Your AI finally knows what happened today — and the raw data never left your phone.**
 
-Daywire is an open-source, phone-first life-context bridge: a native Android app (with an optional home hub) that turns notifications, calls, photos, location and calendar into *redacted* semantic events, then feeds them to whichever assistant you already use (Claude, Grok, ChatGPT, Gemini, local models) over MCP, with proactive nudges back through Telegram or your lock screen.
+Daywire is an open-source, phone-first life-context bridge. It turns the day into redacted semantic events and hands those events to the assistant you already use.
 
-**Status:** research / pre-POC. Architecture and go-to-market notes only; no shipping code yet.
+**Status:** Week 1 localhost Go core. The process binds to loopback, stores redacted events in SQLite, and speaks MCP. Phone capture, on-device speech-to-text, and speaker identification are later weeks.
 
 **License:** TBD
 
+## Week 1
+
+The `daywire` binary:
+
+- stores `commitment`, `ask`, `visit`, and `note` events
+- encrypts summary and nudge text with AES-256-GCM
+- serves MCP on `127.0.0.1` only (`query_events`, `subscribe`, `propose_nudge`)
+- delivers nudges to [ntfy](https://ntfy.sh) or, when no topic is set, writes the nudge to the log
+- checks itself with `daywire doctor`
+- seeds a few synthetic calendar and mail events (`daywire seed`)
+
+Assistants receive the redacted summary. There is no audio field and no upload route.
+
+What is intentionally absent is listed in [docs/poc-week1.md](docs/poc-week1.md).
+
+## Build
+
+Requires Go 1.26 (the `go` directive in `go.mod`; the toolchain downloads it when `GOTOOLCHAIN=auto`).
+
+```bash
+./hack/make.sh all
+```
+
+That runs `gofmt -l`, `go vet`, `go test -race ./...`, and writes `output/daywire`. The Makefile calls the same script: `make all`, `make test`, `make build`.
+
+## Run
+
+```bash
+./output/daywire seed
+./output/daywire doctor
+./output/daywire serve
+```
+
+`serve` listens on `127.0.0.1:8765` until SIGINT or SIGTERM. Any other bind address is refused. Data lives in `$XDG_CONFIG_HOME/daywire` or `~/.config/daywire` (`events.db` and `data.key`, directory mode `0700`, files mode `0600`).
+
+In another shell, the same operations are available over HTTP on that loopback port. These routes call the same code as the MCP tools:
+
+```bash
+curl -sS http://127.0.0.1:8765/health
+curl -sS 'http://127.0.0.1:8765/events?limit=10'
+curl -sS 'http://127.0.0.1:8765/events?type=visit'
+curl -sS 'http://127.0.0.1:8765/events/poll?limit=10'
+curl -sS -X POST http://127.0.0.1:8765/nudges \
+  -H 'content-type: application/json' \
+  -d '{"title":"Synthetic nudge","message":"Pack the spare charger."}'
+```
+
+With `DAYWIRE_NTFY_URL` unset, the nudge is the log line `nudge logged` on the server's stderr. That log line is the desktop fallback, so it includes the nudge text. Other logs do not include event or nudge bodies.
+
+### ntfy
+
+```bash
+export DAYWIRE_NTFY_URL='https://ntfy.sh/your-private-topic'
+# optional, for a topic that requires auth; never logged
+export DAYWIRE_NTFY_TOKEN='your-token'
+./output/daywire serve
+```
+
+`propose_nudge` then POSTs the title and message to that URL. `daywire doctor` reports the host only. It does not print the topic path or the token. An unset URL is a skip, not a failure.
+
+## MCP client
+
+The streamable HTTP endpoint is `http://127.0.0.1:8765/mcp`.
+
+Cursor (or another client that takes a URL):
+
+```json
+{
+  "mcpServers": {
+    "daywire": {
+      "url": "http://127.0.0.1:8765/mcp"
+    }
+  }
+}
+```
+
+Tools:
+
+| Tool | Arguments | Result |
+|---|---|---|
+| `query_events` | `type`, `since`, `until` (RFC3339), `limit` (default 50, max 200) | redacted events, newest `occurred_at` first |
+| `subscribe` | `cursor`, `limit`, `wait_ms` (max 25000) | events created after the cursor, plus the next cursor. Week 1 is a poll / long-poll, not a push stream |
+| `propose_nudge` | `title`, `message`, optional `priority` 1–5 | `{id, channel, delivered, detail}` |
+
+`GET /events/poll` is the curl form of `subscribe`.
+
+## Configuration
+
+| Variable | Purpose |
+|---|---|
+| `DAYWIRE_ADDR` | Listen address. Default `127.0.0.1:8765`. Must be loopback. |
+| `DAYWIRE_DATA_DIR` | Data directory. Default `$XDG_CONFIG_HOME/daywire` or `~/.config/daywire`. |
+| `DAYWIRE_DATA_KEY` | Base64-encoded 32-byte AES key. Not written to disk. |
+| `DAYWIRE_DATA_KEY_FILE` | File containing that key (base64 or 32 raw bytes). Missing file is an error. |
+| `DAYWIRE_NTFY_URL` | Full ntfy topic URL. Unset means log the nudge. |
+| `DAYWIRE_NTFY_TOKEN` | Optional bearer token for ntfy. |
+| `DAYWIRE_LOG_LEVEL` | `debug`, `info`, `warn`, or `error`. |
+
+If neither key variable is set, the first command creates `<data dir>/data.key` with mode `0600` and reuses it. Flags `--addr` and `--data-dir` override the matching variables. The key and the ntfy token are environment-only so they do not appear in the process list.
+
+### Encryption
+
+The database is [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) (pure Go, not SQLCipher). `type`, timestamps, and ids stay in the clear so `query_events` can filter. The summary, nudge title, and nudge message are AES-256-GCM ciphertext, each bound to its row id. Changing the key does not rewrite old rows; opens of those rows fail until the original key is restored. There is no key rotation in Week 1.
+
 ## Docs
 
-- [Concept report (v5)](docs/research/daywire-concept-report.md) — verdict, architecture, GTM, platform feasibility, name research, scores
-- [Research notes](docs/research/notes/) — sourced notes from the research rounds
+- [Week 1 POC notes](docs/poc-week1.md)
+- [Concept report (v5)](docs/research/daywire-concept-report.md)
+- [Research notes](docs/research/notes/)
 
 ## Naming history
 
