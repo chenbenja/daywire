@@ -43,7 +43,7 @@ That runs `gofmt -l`, `go vet`, `go test -race ./...`, and writes `output/daywir
 
 `serve` listens on `127.0.0.1:8765` until SIGINT or SIGTERM. Any other bind address is refused. Data lives in `$XDG_CONFIG_HOME/daywire` or `~/.config/daywire` (`events.db` and `data.key`, directory mode `0700`, files mode `0600`).
 
-In another shell, the same operations are available over HTTP on that loopback port. These routes call the same code as the MCP tools:
+In another shell, the same operations are available over HTTP on that loopback port. These routes call the same code as the MCP tools. A request is rejected unless its `Host` header is `localhost` or a loopback address:
 
 ```bash
 curl -sS http://127.0.0.1:8765/health

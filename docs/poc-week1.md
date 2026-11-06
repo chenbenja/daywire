@@ -16,7 +16,7 @@ Week 1 is a single Go process. It stores redacted semantic events, serves them t
 | Doctor | `daywire doctor` | Bind address is loopback, database opens, MCP answers an in-process `query_events`, live server is probed when one is up, ntfy URL is present or skipped. |
 | Demo seed | `daywire seed` | Four synthetic events (calendar, mail, visit, note). Fixed ids, so running it again inserts nothing. No real personal data and no audio. |
 
-The HTTP routes `GET /health`, `GET /events`, `GET /events/poll`, and `POST /nudges` are the curl equivalent of the MCP tools. They are mounted on the same loopback listener. A non-loopback `RemoteAddr` is rejected.
+The HTTP routes `GET /health`, `GET /events`, `GET /events/poll`, and `POST /nudges` are the curl equivalent of the MCP tools. They are mounted on the same loopback listener. A non-loopback `RemoteAddr` is rejected, and the `Host` header must be `localhost` or a loopback address.
 
 Build and the client snippet are in the [README](../README.md).
 
@@ -37,6 +37,7 @@ The store is append-only in this slice. There is no delete API, no key rotation,
 ## Safety choices already in the binary
 
 - `serve` refuses to listen unless the address is `localhost`, `127.0.0.0/8`, or `::1`.
+- Every route rejects a `Host` header that is not `localhost` or a loopback address, which stops a browser on the same machine from reading events after a DNS rebinding.
 - Errors and ordinary logs do not include event summaries or nudge bodies. The log nudge channel is the exception: that line is the delivery itself.
 - Doctor output includes the ntfy host, not the topic path or bearer token.
 - Ntfy redirects are refused, so a topic URL cannot bounce the body to another host.

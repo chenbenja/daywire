@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/chenbenja/daywire/internal/buildinfo"
+	"github.com/chenbenja/daywire/internal/event"
 	"github.com/chenbenja/daywire/internal/nudge"
 	"github.com/chenbenja/daywire/internal/seed"
 	"github.com/chenbenja/daywire/internal/server"
@@ -36,6 +37,74 @@ func TestRejectsNonLoopbackListenAndRemoteAddr(t *testing.T) {
 	rr := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rr, req)
 	require.Equal(t, http.StatusForbidden, rr.Code)
+}
+
+func TestRejectsRebindingHost(t *testing.T) {
+	const marker = "REDACTED-SUMMARY-MARKER-rebinding"
+	cfg := testutil.LoadConfig(t)
+	ctx := testutil.Context(t)
+	st := testutil.OpenStore(t, cfg)
+	now := time.Date(2026, 11, 5, 16, 0, 0, 0, time.UTC)
+	require.NoError(t, st.InsertEvent(ctx, event.Event{
+		ID:         "rebinding-note",
+		Type:       event.TypeNote,
+		SourceID:   "synthetic:note",
+		OccurredAt: now,
+		CreatedAt:  now,
+		Summary:    marker,
+	}))
+
+	var nudgeHits int
+	ntfySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nudgeHits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(ntfySrv.Close)
+
+	logger := testutil.Logger(t)
+	svc := service.New(st, nudge.New(ntfySrv.URL+"/topic", "secret-token", logger), logger)
+	srv := server.New("127.0.0.1:9", svc, logger)
+	httpSrv := httptest.NewServer(srv.Handler())
+	t.Cleanup(httpSrv.Close)
+
+	for _, path := range []string{"/health", "/events", "/events/poll", "/mcp"} {
+		req, err := http.NewRequest(http.MethodGet, httpSrv.URL+path, nil)
+		require.NoError(t, err)
+		req.Host = "evil.example"
+		res, err := httpSrv.Client().Do(req)
+		require.NoError(t, err)
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, res.Body.Close())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusForbidden, res.StatusCode, path)
+		require.NotContains(t, string(body), marker, path)
+		require.NotContains(t, string(body), "secret-token", path)
+	}
+
+	nudgeReq, err := http.NewRequest(http.MethodPost, httpSrv.URL+"/nudges", strings.NewReader(`{"title":"Synthetic nudge","message":"Pack the spare charger."}`))
+	require.NoError(t, err)
+	nudgeReq.Host = "evil.example:8765"
+	nudgeReq.Header.Set("Content-Type", "application/json")
+	nudgeRes, err := httpSrv.Client().Do(nudgeReq)
+	require.NoError(t, err)
+	nudgeBody, err := io.ReadAll(nudgeRes.Body)
+	require.NoError(t, nudgeRes.Body.Close())
+	require.NoError(t, err)
+	require.Equal(t, http.StatusForbidden, nudgeRes.StatusCode)
+	require.NotContains(t, string(nudgeBody), "Pack the spare charger.")
+	require.Zero(t, nudgeHits)
+
+	for _, host := range []string{"localhost", "localhost:8765", "127.0.0.1", "127.0.0.1:8765", "[::1]:8765"} {
+		req, err := http.NewRequest(http.MethodGet, httpSrv.URL+"/health", nil)
+		require.NoError(t, err)
+		req.Host = host
+		res, err := httpSrv.Client().Do(req)
+		require.NoError(t, err)
+		_, err = io.Copy(io.Discard, res.Body)
+		require.NoError(t, res.Body.Close())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode, host)
+	}
 }
 
 func TestHTTPAndMCP(t *testing.T) {

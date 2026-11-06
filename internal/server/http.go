@@ -91,20 +91,43 @@ func newHTTP(addr string, svc *service.Service, mcpServer *mcp.Server, logger *s
 	return loopbackOnly(logRequests(logger, mux))
 }
 
+// loopbackOnly allows a request only when the TCP peer is loopback and the
+// Host header is localhost or a loopback address. A browser DNS-rebinding
+// attack connects to 127.0.0.1 with the attacker's domain in Host; rejecting
+// that header keeps event summaries and nudges on the machine.
 func loopbackOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			http.Error(w, "loopback only", http.StatusForbidden)
-			return
-		}
-		ip := net.ParseIP(host)
-		if ip == nil || !ip.IsLoopback() {
+		if !remoteLoopback(r.RemoteAddr) || !hostLoopback(r.Host) {
 			http.Error(w, "loopback only", http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func remoteLoopback(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func hostLoopback(hostport string) bool {
+	hostport = strings.TrimSpace(hostport)
+	if hostport == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		host = strings.Trim(hostport, "[]")
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 type statusWriter struct {

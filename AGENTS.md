@@ -32,7 +32,7 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 
 - Assistants see redacted semantic events (`commitment`, `ask`, `visit`, `note`) over MCP. They do not receive raw call audio.
 - Do not add an audio upload, an attachment route, or a field whose purpose is a recording.
-- Bind MCP and the curl routes to loopback only. Reject other addresses in config validation before `net.Listen`.
+- Bind MCP and the curl routes to loopback only. Reject other addresses in config validation before `net.Listen`. Reject a request whose Host header is not `localhost` or a loopback IP.
 - Default nudge transport is ntfy. Do not add Telegram as the default.
 
 ## Store
