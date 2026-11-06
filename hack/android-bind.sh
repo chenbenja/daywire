@@ -43,15 +43,10 @@ if [[ ! -x "${realgo}" ]]; then
 	echo "Go toolchain not found at ${realgo}. Need Go 1.26 (GOTOOLCHAIN=auto)." >&2
 	exit 1
 fi
+# Portable on GNU and BSD/macOS. The directory also holds the sibling
+# sources jar gomobile writes next to the staged archive.
 wrap=$(mktemp -d)
-staged=""
-cleanup() {
-	rm -rf "${wrap}"
-	if [[ -n "${staged}" ]]; then
-		rm -f "${staged}"
-	fi
-}
-trap cleanup EXIT
+trap 'rm -rf "${wrap}"' EXIT
 cat > "${wrap}/go" << EOF
 #!/bin/sh
 export GOTOOLCHAIN=local
@@ -65,7 +60,7 @@ export PATH="${wrap}:${PATH}"
 gomobile init
 
 out="android/app/libs/daywire.aar"
-staged=$(mktemp --suffix=.aar "${TMPDIR:-/tmp}/daywire-bind.XXXXXX")
+staged="${wrap}/daywire.aar"
 # Phones are arm64. The Studio emulator on a typical laptop is amd64.
 # Add android/arm,android/386 to -target if a 32-bit device is required.
 gomobile bind \
@@ -86,5 +81,4 @@ fi
 
 mkdir -p "$(dirname "${out}")"
 mv "${staged}" "${out}"
-staged=""
 echo "wrote ${out}"

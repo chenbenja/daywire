@@ -23,9 +23,13 @@ func TestAndroidShellPrivacyBoundary(t *testing.T) {
 		}
 		if d.IsDir() {
 			base := d.Name()
-			if base == "build" || base == ".gradle" {
+			switch base {
+			case "build", ".gradle", ".idea", ".kotlin":
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if d.Name() == "local.properties" {
 			return nil
 		}
 		ext := strings.ToLower(filepath.Ext(path))

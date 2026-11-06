@@ -33,7 +33,8 @@
     <string name="record_visit">Record a coarse visit</string>
     <string name="location_permission_denied">Approximate location was not granted, so no visit was stored.</string>
     <string name="location_off">Location is turned off in system settings, so no visit was stored.</string>
-    <string name="location_no_network_provider">Location is on, but this device has no network location provider, so no visit was stored.</string>
+    <string name="location_network_missing">Location is on, but this device has no network location provider, so no visit was stored.</string>
+    <string name="location_network_disabled">Location is on, but the network location provider is turned off, so no visit was stored.</string>
     <string name="location_waiting">Waiting for an approximate location.</string>
     <string name="location_missing">No approximate location yet, so no visit was stored.</string>
     <string name="location_timeout">No approximate location arrived in time, so no visit was stored.</string>
@@ -56,7 +57,7 @@
     <string name="show_nudge">Show a sample nudge</string>
     <string name="nudge_shown">Sample nudge shown on this phone.</string>
     <string name="nudge_not_shown">Notifications are off for Daywire, so the nudge was recorded as not shown.</string>
-    <string name="nudge_permission_denied">Notification permission was not granted. The nudge was recorded as not shown.</string>
+    <string name="nudge_permission_denied">Notification permission was not granted, so the sample nudge was not shown.</string>
 
     <string name="section_events">Recent events</string>
     <string name="insert_note">Insert a synthetic note</string>

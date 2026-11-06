@@ -32,7 +32,7 @@ Notification: <app label> (<package>), <category word>
 
 The app label is the name from the package manager, capped and stripped of control characters. The category word is included only when Android's `Notification.category` is one of the platform constants (`email`, `msg`, `call`, and the rest of the fixed list in `internal/mobile/redact.go`). Any other category string is dropped, so a body stuffed into that field is not stored. The Go method `InsertNotification` has no title parameter and no body parameter. The listener does not read notification extras.
 
-Group-summary notifications are skipped, and so are notifications posted by Daywire itself (the sample nudge must not become a loop).
+Group summaries, ongoing notifications (`FLAG_ONGOING_EVENT`), and foreground-service notifications are skipped, and so are notifications posted by Daywire itself (the sample nudge must not become a loop). The same status-bar key is stored at most once per 60 seconds. An incoming-call notification is usually ongoing, so it does not become an event. Rapid updates to one chat thread collapse into one note.
 
 Visit events are type `visit`, source `android:location`. Latitude and longitude are rounded to two decimal degrees (about 1.1 km) and the summary is `Visit: coarse grid 32.08,34.78`. The raw fix is not stored and is not written to logcat. The grid is the redacted summary, so it does show on the Recent events list.
 
@@ -114,7 +114,7 @@ Install the debug build and open Daywire. The store line should say the store is
 ### Folder
 
 1. Tap **Pick a folder** and choose the directory in the system picker.
-2. Daywire lists top-level names, sorted by Unicode code point (uppercase before lowercase, not dictionary order). Directories are shown with a trailing slash. More than 200 names are shortened to the first 200 after that sort. A folder with exactly 200 names is not marked as shortened. Names are shown on screen and are not stored, logged, or opened.
+2. Daywire lists top-level names in the order of Kotlin `List.sorted()` / `String.compareTo`, which compares UTF-16 code units. For the Basic Multilingual Plane that matches code-point order (uppercase before lowercase). Supplementary characters are not ordered by code point. Directories are shown with a trailing slash. More than 200 names are shortened to the first 200 after that sort. A folder with exactly 200 names is not marked as shortened. Names are shown on screen and are not stored, logged, or opened.
 3. **Forget folder** drops the permission. It does not delete the files.
 
 ### Nudge

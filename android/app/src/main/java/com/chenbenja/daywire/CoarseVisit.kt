@@ -79,7 +79,8 @@ internal object CoarseVisit {
         val failed = app.getString(R.string.action_failed)
         val denied = app.getString(R.string.location_permission_denied)
         val off = app.getString(R.string.location_off)
-        val noProvider = app.getString(R.string.location_no_network_provider)
+        val networkMissing = app.getString(R.string.location_network_missing)
+        val networkDisabled = app.getString(R.string.location_network_disabled)
         val timedOut = app.getString(R.string.location_timeout)
         val manager = app.getSystemService(LocationManager::class.java)
         val locationOn = try {
@@ -87,17 +88,22 @@ internal object CoarseVisit {
         } catch (error: Exception) {
             false
         }
-        val network = try {
-            manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-        } catch (error: IllegalArgumentException) {
-            false
-        }
         if (!locationOn) {
             VisitSession.finish(off)
             return
         }
-        if (!network) {
-            VisitSession.finish(noProvider)
+        if (!manager.allProviders.contains(LocationManager.NETWORK_PROVIDER)) {
+            VisitSession.finish(networkMissing)
+            return
+        }
+        val networkEnabled = try {
+            manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        } catch (error: IllegalArgumentException) {
+            VisitSession.finish(networkMissing)
+            return
+        }
+        if (!networkEnabled) {
+            VisitSession.finish(networkDisabled)
             return
         }
         VisitSession.begin()
@@ -131,7 +137,7 @@ internal object CoarseVisit {
                             core.insertCoarseVisit(location.latitude, location.longitude, location.time)
                         }
                         stored
-                    } catch (error: Exception) {
+                    } catch (error: Throwable) {
                         error.message ?: failed
                     }
                     VisitSession.finish(shown)

@@ -20,9 +20,11 @@ class AllowListActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAllowListBinding
     private val adapter = AppPickerAdapter()
     private val saveGate = AllowListGate()
+    private var restoredSelection: Set<String>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        restoredSelection = savedInstanceState?.getStringArrayList(STATE_SELECTION)?.toSet()
         binding = ActivityAllowListBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.apps.layoutManager = LinearLayoutManager(this)
@@ -44,12 +46,17 @@ class AllowListActivity : AppCompatActivity() {
         }
         Thread {
             val apps = loadApps()
-            val selected = AllowList.packages(this)
+            val selected = restoredSelection ?: AllowList.packages(this)
             runOnUiThread {
                 if (isDestroyed) {
                     return@runOnUiThread
                 }
                 adapter.submit(apps, selected)
+                for (pkg in selected) {
+                    if (apps.none { it.packageName == pkg }) {
+                        adapter.addCustom(LaunchableApp(packageName = pkg, label = pkg, icon = null))
+                    }
+                }
                 saveGate.onLoaded()
                 binding.buttonAdd.isEnabled = true
                 binding.buttonSave.isEnabled = saveGate.saveEnabled
@@ -57,6 +64,14 @@ class AllowListActivity : AppCompatActivity() {
                 updateEmpty()
             }
         }.start()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (!saveGate.saveEnabled) {
+            return
+        }
+        outState.putStringArrayList(STATE_SELECTION, ArrayList(adapter.selection()))
     }
 
     private fun addTypedPackage() {
@@ -109,6 +124,8 @@ class AllowListActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val STATE_SELECTION = "allow_selection"
+
         // Same shape as cleanPackage in internal/mobile/redact.go.
         private val packagePattern = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$")
 

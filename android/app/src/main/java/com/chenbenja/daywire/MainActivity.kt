@@ -27,15 +27,8 @@ class MainActivity : AppCompatActivity() {
         if (granted) {
             showSampleNudge()
         } else {
-            Thread {
-                try {
-                    LocalNudge.recordUnshown(this)
-                } catch (error: Exception) {
-                    runOnUiThread { setStatus(error.message ?: getString(R.string.action_failed)) }
-                    return@Thread
-                }
-                runOnUiThread { setStatus(getString(R.string.nudge_permission_denied)) }
-            }.start()
+            LocalNudge.recordUnshown(this)
+            setStatus(getString(R.string.nudge_permission_denied))
         }
     }
 
@@ -165,10 +158,13 @@ class MainActivity : AppCompatActivity() {
         Thread {
             val status = try {
                 LocalNudge.showSample(this)
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 error.message ?: getString(R.string.action_failed)
             }
             runOnUiThread {
+                if (isDestroyed) {
+                    return@runOnUiThread
+                }
                 setStatus(status)
                 refreshEvents()
             }
@@ -186,10 +182,13 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
                 getString(R.string.note_stored)
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 error.message ?: getString(R.string.action_failed)
             }
             runOnUiThread {
+                if (isDestroyed) {
+                    return@runOnUiThread
+                }
                 setStatus(status)
                 refreshEvents()
             }
@@ -202,12 +201,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             getString(R.string.listener_off)
         }
-        val allowed = AllowList.packages(this)
-        binding.textAllow.text = if (allowed.isEmpty()) {
-            getString(R.string.allow_empty)
-        } else {
-            getString(R.string.allow_count, allowed.size)
-        }
+        refreshAllowCount()
         val openError = (application as DaywireApp).openError
         val ready = DaywireCore.isOpen()
         binding.textStore.text = when {
@@ -224,6 +218,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun listenerEnabled(): Boolean {
         return NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
+    }
+
+    private var allowGeneration = 0
+
+    private fun refreshAllowCount() {
+        val generation = ++allowGeneration
+        Thread {
+            val count = try {
+                AllowList.packages(applicationContext).size
+            } catch (error: Throwable) {
+                -1
+            }
+            runOnUiThread {
+                if (isDestroyed || generation != allowGeneration) {
+                    return@runOnUiThread
+                }
+                binding.textAllow.text = when {
+                    count < 0 -> getString(R.string.allow_empty)
+                    count == 0 -> getString(R.string.allow_empty)
+                    else -> getString(R.string.allow_count, count)
+                }
+            }
+        }.start()
     }
 
     private var folderGeneration = 0
@@ -266,7 +283,7 @@ class MainActivity : AppCompatActivity() {
         Thread {
             val json = try {
                 DaywireCore.call(this) { core -> core.listEventsJSON("", 50L) }
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 null
             }
             val text = if (json == null) {

@@ -20,8 +20,15 @@ import java.util.concurrent.Executors
  */
 internal object DaywireCore {
     private val lock = Any()
+
+    @Volatile
+    private var storeThread: Thread? = null
+
     private val executor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "daywire-core").apply { isDaemon = true }
+        Thread(runnable, "daywire-core").apply {
+            isDaemon = true
+            storeThread = this
+        }
     }
     private val main = Handler(Looper.getMainLooper())
 
@@ -75,12 +82,16 @@ internal object DaywireCore {
 
     /**
      * Runs [block] on the store thread and waits. Throws if called on the main
-     * thread: the Go call can take as long as its timeout.
+     * thread or on the store thread. The store thread case would deadlock:
+     * this method waits for the same single thread that is running the caller.
      */
     @WorkerThread
     fun <T> call(context: Context, block: (Core) -> T): T {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             throw IllegalStateException("store call on the main thread")
+        }
+        if (Thread.currentThread() === storeThread) {
+            throw IllegalStateException("store call on the store thread")
         }
         val app = context.applicationContext
         try {
