@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/chenbenja/daywire/internal/testutil"
+	"github.com/chenbenja/daywire/internal/voiceprint"
 )
 
 func TestEnrollAndLabelOwner(t *testing.T) {
@@ -72,6 +73,41 @@ func TestEnrollAndLabelOwner(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(dir, "events.db"))
 	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestFixtureClipsLabelOwnerAndOther(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
+	engine, err := NewEngine(ctx, modelCache(t), testutil.Logger(t))
+	if err != nil {
+		require.ErrorIs(t, err, ErrModelsUnavailable)
+		t.Skip(err.Error())
+	}
+	t.Cleanup(func() { require.NoError(t, engine.Close()) })
+
+	_, enroll, err := ReadWAV(ctx, filepath.Join("testdata", FixtureEnroll))
+	require.NoError(t, err)
+	_, owner, err := ReadWAV(ctx, filepath.Join("testdata", FixtureOwner))
+	require.NoError(t, err)
+	_, other, err := ReadWAV(ctx, filepath.Join("testdata", FixtureOther))
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	key := testKey(t)
+	_, err = Enroll(ctx, engine, dir, key, "owner", enroll, SampleRate)
+	require.NoError(t, err)
+
+	ownerVec, err := engine.Embed(ctx, owner, SampleRate)
+	require.NoError(t, err)
+	ownerLabel, err := voiceprint.Match(ctx, dir, key, "owner", ownerVec)
+	require.NoError(t, err)
+	require.Equal(t, voiceprint.OwnerLabel, ownerLabel)
+
+	otherVec, err := engine.Embed(ctx, other, SampleRate)
+	require.NoError(t, err)
+	otherLabel, err := voiceprint.Match(ctx, dir, key, "owner", otherVec)
+	require.NoError(t, err)
+	require.Equal(t, voiceprint.OtherLabel, otherLabel)
 }
 
 func labelOf(res Result, speakerID int) string {

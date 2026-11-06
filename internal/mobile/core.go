@@ -26,8 +26,10 @@ const (
 // Core is an open on-device store. It does not listen on a port and it does
 // not import the MCP server.
 type Core struct {
-	store *store.Store
-	log   *slog.Logger
+	store   *store.Store
+	log     *slog.Logger
+	dataDir string
+	key     []byte
 }
 
 // Open opens or creates the store under dataDir. Summaries and nudge text are
@@ -60,7 +62,7 @@ func OpenWithLogger(dataDir string, logger *slog.Logger) (*Core, error) {
 		return nil, err
 	}
 	logger.Info("daywire core open", "key_source", cfg.KeySource)
-	return &Core{store: st, log: logger}, nil
+	return &Core{store: st, log: logger, dataDir: cfg.DataDir, key: cfg.DataKey}, nil
 }
 
 // Close closes the database.
@@ -70,6 +72,10 @@ func (c *Core) Close() error {
 	}
 	err := c.store.Close()
 	c.store = nil
+	for i := range c.key {
+		c.key[i] = 0
+	}
+	c.key = nil
 	if err != nil {
 		return fmt.Errorf("close core: %w", err)
 	}

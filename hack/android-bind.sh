@@ -3,7 +3,8 @@
 #
 # gomobile's JNI wrapper is cgo. The Daywire packages in that archive are the
 # pure-Go store, crypt, and event code. This script does not pass -tags speaker
-# and does not link sherpa or onnxruntime.
+# and does not link sherpa or onnxruntime. Week 3 speech inference is the
+# separate sherpa-onnx Android archive from hack/fetch-speech-models.sh.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)

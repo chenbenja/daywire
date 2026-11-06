@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Daywire is a phone-first life-context bridge. Week 1 is a localhost Go process: redacted events, an encrypted SQLite store, a loopback MCP server, ntfy nudges, and `daywire doctor`. Week 2 is a thin Android shell that uses that store on the phone. The laptop speaker-id spike stays behind the `speaker` build tag and is not linked into the APK.
+Daywire is a phone-first life-context bridge. Week 1 is a localhost Go process: redacted events, an encrypted SQLite store, a loopback MCP server, ntfy nudges, and `daywire doctor`. Week 2 is a thin Android shell that uses that store on the phone. Week 3 adds on-device speech in that shell: enroll and forget an owner voiceprint, then diarize, embed, and transcribe a picked WAV. The laptop speaker-id spike stays behind the `speaker` build tag and is not linked into the Go archive.
 
 These conventions follow the shape of Chen's private Go services (in particular the sanit-internal layout and review habits). They are adapted for Daywire. Do not copy Sanit product code into this repo.
 
@@ -11,8 +11,8 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 ## Layout
 
 - `cmd/daywire/` is a thin `main`. Flag parsing and subcommands live in `internal/cli`.
-- Product code lives under `internal/`. One concern per package: `event`, `crypt`, `config`, `store`, `proposal`, `nudge`, `seed`, `service`, `server`, `doctor`, `speaker`, `mobile`. `proposal` checks nudge text and does not import a network client. `speaker` is the laptop enroll-then-owner spike. The sherpa engine is behind the `speaker` build tag, so the default `daywire` binary stays pure Go. The spike does not add an event field or a network bind. `internal/mobile` is the on-device store API. `mobile/` is the gomobile bind surface, because the generated JNI wrapper cannot import an `internal` package.
-- `android/` is the Week 2 Kotlin shell. `./hack/make.sh all` does not build it. `./hack/android-bind.sh` writes `android/app/libs/daywire.aar` and must not pass `-tags speaker`.
+- Product code lives under `internal/`. One concern per package: `event`, `crypt`, `config`, `store`, `proposal`, `nudge`, `seed`, `service`, `server`, `doctor`, `speaker`, `voiceprint`, `speech`, `mobile`. `proposal` checks nudge text and does not import a network client. `speaker` is the laptop enroll-then-owner spike. The sherpa engine is behind the `speaker` build tag, so the default `daywire` binary stays pure Go. The spike does not add an audio field or a network bind. `voiceprint` is the encrypted embedding file and the owner/other/unknown cut. `speech` caps speaker-labeled transcript text. Neither imports sherpa or `net/http`. `internal/mobile` is the on-device store API. `mobile/` is the gomobile bind surface, because the generated JNI wrapper cannot import an `internal` package.
+- `android/` is the phone shell. Week 3 speech inference is the sherpa-onnx Android archive, fetched by `./hack/fetch-speech-models.sh`, not the Go archive. `./hack/make.sh all` does not build the app and does not download models. `./hack/android-bind.sh` writes `android/app/libs/daywire.aar` and must not pass `-tags speaker`.
 - `hack/make.sh` is the build entry. The Makefile only calls it.
 - Binaries go to `output/`. Do not commit `output/`.
 
@@ -31,7 +31,7 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 
 ## Privacy boundary
 
-- Assistants see redacted semantic events (`commitment`, `ask`, `visit`, `note`) over MCP. They do not receive raw call audio.
+- Assistants see redacted semantic events (`commitment`, `ask`, `visit`, `note`) over MCP. They do not receive raw call audio. A speech turn is a `note` whose summary is a speaker label plus transcript text. The source id is `android:speech`. It is not a file path.
 - Do not add an audio upload, an attachment route, or a field whose purpose is a recording.
 - Bind MCP and the curl routes to loopback only. Reject other addresses in config validation before `net.Listen`. Reject a request whose Host header is not `localhost` or a loopback IP.
 - Default nudge transport on the laptop is ntfy. Do not add Telegram as the default. The phone shell uses NotificationCompat and does not require ntfy.
@@ -42,7 +42,8 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 - SQLite through `modernc.org/sqlite` (pure Go).
 - Sensitive columns use AES-256-GCM (`internal/crypt`) with a 32-byte key from `DAYWIRE_DATA_KEY`, `DAYWIRE_DATA_KEY_FILE`, or a generated `<data dir>/data.key` (mode `0600`).
 - Type, time, and ids stay plaintext so queries work. Document this if the scheme changes.
-- Data directory: `$XDG_CONFIG_HOME/daywire` or `~/.config/daywire`, mode `0700`.
+- Data directory: `$XDG_CONFIG_HOME/daywire` or `~/.config/daywire`, mode `0700`. On the phone it is the app-private no-backup store directory.
+- The owner voiceprint is `<data-dir>/speakers/owner.emb`, mode `0600`, directory `0700`, AES-256-GCM column `speaker.embedding`. Forgetting enrollment deletes that file.
 
 ## Tests
 
@@ -54,4 +55,4 @@ The intended licence for the hub and app core is AGPL, with a permissive adapter
 
 ## Out of scope unless a human asks
 
-Telegram-as-default, Play Store listing, FCM, Hebrew STT, on-device speech models in the APK, voiceprint enrollment, and writing licence files. Do not link sherpa, onnxruntime, or the `speaker` build tag into `android/`.
+Telegram-as-default, Play Store listing, FCM, and writing licence files. Do not pass `-tags speaker` to the gomobile bind, and do not put sherpa or onnxruntime inside `daywire.aar`. Phone speech uses the separate sherpa-onnx Android archive. Hebrew STT is the pinned ivrit-ai Zipformer when those files were fetched at build time.

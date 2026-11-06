@@ -1,6 +1,6 @@
 # Laptop speaker-id spike
 
-This is a laptop check that enrollment can be matched to a speaker cluster. It is not the phone stack. On-device models (LiteRT or sherpa on Android) are Week 2–3. Week 1 assistants still receive only redacted text events. This command does not add an audio field, an upload route, or a network bind.
+This is a laptop check that enrollment can be matched to a speaker cluster. The phone path is [Week 3](poc-week3-speech.md): it stores the same encrypted embedding and scores each window `owner`, `other`, or `unknown` instead of clustering a whole file. This command does not add an audio field, an upload route, or a network bind. `serve` and `doctor` still do not link sherpa.
 
 ## What it proves
 

@@ -43,7 +43,7 @@ func TestAndroidShellPrivacyBoundary(t *testing.T) {
 			return err
 		}
 		text := string(body)
-		rel := strings.TrimPrefix(path, root+string(filepath.Separator))
+		rel := filepath.ToSlash(strings.TrimPrefix(path, root+string(filepath.Separator)))
 		for _, forbidden := range []string{
 			".extras",
 			"EXTRA_",
@@ -64,6 +64,9 @@ func TestAndroidShellPrivacyBoundary(t *testing.T) {
 			"AudioRecord",
 			"SpeechRecognizer",
 		} {
+			if speechTokenAllowed(rel, forbidden) {
+				continue
+			}
 			require.NotContains(t, strings.ToLower(text), strings.ToLower(forbidden), "%s contains %s", rel, forbidden)
 		}
 		if ext == ".kt" {
@@ -87,6 +90,11 @@ func TestAndroidShellPrivacyBoundary(t *testing.T) {
 	require.Contains(t, joined, "recordLocalNudge(")
 	require.Contains(t, joined, "OpenDocumentTree")
 	require.Contains(t, joined, "insertRedactedNote(")
+	require.Contains(t, joined, "insertSpeechTurn(")
+	require.Contains(t, joined, "saveOwnerVoiceprint(")
+	require.Contains(t, joined, "forgetOwnerVoiceprint(")
+	require.Contains(t, joined, "labelOwner(")
+	require.Contains(t, joined, "OpenSpeechDocument")
 
 	listener, err := os.ReadFile(filepath.Join(root, "app/src/main/java/com/chenbenja/daywire/DaywireNotificationListener.kt"))
 	require.NoError(t, err)
@@ -134,6 +142,7 @@ func TestAndroidShellPrivacyBoundary(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(folder), "capSortedNames(")
 	require.Contains(t, string(folder), "releasePersistableUriPermission")
+	require.NotContains(t, string(folder), "openInputStream")
 
 	manifest, err := os.ReadFile(filepath.Join(root, "app/src/main/AndroidManifest.xml"))
 	require.NoError(t, err)
@@ -142,4 +151,23 @@ func TestAndroidShellPrivacyBoundary(t *testing.T) {
 	require.Contains(t, manifestText, "ACCESS_COARSE_LOCATION")
 	require.Contains(t, manifestText, "POST_NOTIFICATIONS")
 	require.Contains(t, manifestText, "allowBackup=\"false\"")
+	require.NotContains(t, manifestText, "RECORD_AUDIO")
+	require.NotContains(t, manifestText, "INTERNET")
+}
+
+func speechTokenAllowed(rel, token string) bool {
+	switch strings.ToLower(token) {
+	case "openinputstream":
+		return rel == "app/src/main/java/com/chenbenja/daywire/SpeechWork.kt"
+	case "sherpa":
+		return rel == "app/build.gradle.kts" ||
+			rel == "app/src/main/java/com/chenbenja/daywire/SpeechRuntime.kt" ||
+			strings.HasPrefix(rel, "app/src/speech/")
+	case "onnx", "moonshine":
+		return rel == "app/build.gradle.kts" ||
+			rel == "app/src/main/java/com/chenbenja/daywire/SpeechAssets.kt" ||
+			strings.HasPrefix(rel, "app/src/speech/")
+	default:
+		return false
+	}
 }

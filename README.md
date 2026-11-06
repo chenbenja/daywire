@@ -4,7 +4,7 @@
 
 Daywire is an open-source, phone-first life-context bridge. It turns the day into redacted semantic events and hands those events to the assistant you already use.
 
-**Status:** Week 1 localhost Go core, plus a Week 2 Android shell. The laptop process binds to loopback, stores redacted events in SQLite, and speaks MCP. The phone app stores the same events on the device. A laptop speaker-identification spike (`./hack/make.sh speaker`) enrolls a voice locally and labels that cluster `owner`. It does not send audio to assistants, and it is not in the phone app. On-device speech-to-text is still later.
+**Status:** Week 1 localhost Go core, a Week 2 Android shell, and Week 3 on-device speech. The laptop process binds to loopback, stores redacted events in SQLite, and speaks MCP. The phone app stores the same events on the device. It can enroll an owner voice from a picked WAV, forget that enrollment, and write speaker-labeled text from another picked WAV. Audio does not leave the phone. A laptop speaker-identification spike (`./hack/make.sh speaker`) still exists behind a separate build.
 
 **License:** TBD
 
@@ -21,7 +21,7 @@ The `daywire` binary:
 
 Assistants receive the redacted summary. There is no audio field and no upload route.
 
-What is intentionally absent from the laptop core is listed in [docs/poc-week1.md](docs/poc-week1.md). The laptop speaker spike is [docs/speaker-spike.md](docs/speaker-spike.md). The phone shell is [docs/poc-week2-android.md](docs/poc-week2-android.md).
+What is intentionally absent from the laptop core is listed in [docs/poc-week1.md](docs/poc-week1.md). The laptop speaker spike is [docs/speaker-spike.md](docs/speaker-spike.md). The phone shell is [docs/poc-week2-android.md](docs/poc-week2-android.md). On-device speech is [docs/poc-week3-speech.md](docs/poc-week3-speech.md).
 
 ## Speaker spike
 
@@ -36,16 +36,21 @@ That build downloads the pinned models into `output/speaker-models/` (gitignored
 
 ## Week 2 Android shell
 
-`android/` is a project Android Studio can open. Summaries and nudge text are AES-256-GCM on the phone; identifiers, types, times, and source names stay readable, and the database file is not encrypted as a whole. The key is a file in app-private storage, not the Android Keystore. The app asks before reading notifications or location, lists a folder you pick, and shows nudges with the phone's own notifications. ntfy is not used on the phone. Speech models are not in the app.
+`android/` is a project Android Studio can open. Summaries and nudge text are AES-256-GCM on the phone; identifiers, types, times, and source names stay readable, and the database file is not encrypted as a whole. The key is a file in app-private storage, not the Android Keystore. The app asks before reading notifications or location, lists a folder you pick, and shows nudges with the phone's own notifications. ntfy is not used on the phone.
 
-Open the project only after the Go archive exists:
+## Week 3 on-device speech
+
+The same app enrolls an owner voiceprint from one picked 16 kHz mono PCM WAV, can forget it, and processes another picked file on the phone: 10 second windows, pyannote segmentation, NeMo SpeakerNet, cosine owner/other/unknown, then Moonshine tiny English or the ivrit-ai Hebrew Zipformer. Turns are stored as redacted notes. There is no microphone and no `INTERNET` permission. Models are fetched at build time:
 
 ```bash
+./hack/fetch-speech-models.sh
 export ANDROID_HOME="$HOME/Android/Sdk"   # Android Studio's SDK path
 ./hack/android-bind.sh
 ```
 
-Then in Android Studio: File → Open → the `android/` directory. The click-by-click for notification access, location, and the folder picker is in [docs/poc-week2-android.md](docs/poc-week2-android.md).
+Details, licences, and SHA-256 pins are in [docs/poc-week3-speech.md](docs/poc-week3-speech.md).
+
+Open the project only after the Go archive exists. Then in Android Studio: File → Open → the `android/` directory. The click-by-click for notification access, location, and the folder picker is in [docs/poc-week2-android.md](docs/poc-week2-android.md).
 
 ## Build
 

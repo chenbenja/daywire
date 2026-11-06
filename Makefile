@@ -1,4 +1,4 @@
-.PHONY: all fmt fmt-write vet test build speaker android
+.PHONY: all fmt fmt-write vet test build speaker android speech-models
 
 all:
 	./hack/make.sh all
@@ -23,3 +23,6 @@ speaker:
 
 android:
 	./hack/make.sh android
+
+speech-models:
+	./hack/make.sh speech-models

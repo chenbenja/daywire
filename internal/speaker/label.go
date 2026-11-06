@@ -1,12 +1,16 @@
 package speaker
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/chenbenja/daywire/internal/voiceprint"
+)
 
 const (
 	// OwnerLabel is the cluster that matches the enrolled voice.
-	OwnerLabel = "owner"
+	OwnerLabel = voiceprint.OwnerLabel
 	// OtherLabel is every cluster that does not match.
-	OtherLabel = "other"
+	OtherLabel = voiceprint.OtherLabel
 )
 
 // ErrNoOwner means no cluster reached the owner score.

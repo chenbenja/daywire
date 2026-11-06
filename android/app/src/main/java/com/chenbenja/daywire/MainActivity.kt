@@ -44,6 +44,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val speechMime = arrayOf("audio/wav", "audio/x-wav", "audio/wave", "audio/*")
+
+    private val enrollAudio = registerForActivityResult(OpenSpeechDocument()) { uri ->
+        if (uri == null) {
+            return@registerForActivityResult
+        }
+        SpeechWork.enroll(this, uri)
+    }
+
+    private val processAudio = registerForActivityResult(OpenSpeechDocument()) { uri ->
+        if (uri == null) {
+            return@registerForActivityResult
+        }
+        SpeechWork.process(this, uri)
+    }
+
     private val openTree = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
@@ -79,6 +95,13 @@ class MainActivity : AppCompatActivity() {
         binding.buttonNudge.setOnClickListener { onNudge() }
         binding.buttonSynthetic.setOnClickListener { insertSynthetic() }
         binding.buttonRefresh.setOnClickListener { refreshEvents() }
+        binding.speechLanguage.setOnCheckedChangeListener { _, checkedId ->
+            SpeechSession.setLanguage(if (checkedId == R.id.speechHebrew) "he" else "en")
+        }
+        binding.buttonSpeechEnroll.setOnClickListener { enrollAudio.launch(speechMime) }
+        binding.buttonSpeechProcess.setOnClickListener { processAudio.launch(speechMime) }
+        binding.buttonSpeechForget.setOnClickListener { SpeechWork.forget(this) }
+        renderSpeech()
     }
 
     override fun onStart() {
@@ -93,25 +116,39 @@ class MainActivity : AppCompatActivity() {
                 applyActionStatus()
             }
         }
+        SpeechSession.setListener { refresh ->
+            if (isDestroyed) {
+                return@setListener
+            }
+            renderSpeech()
+            if (refresh) {
+                refreshEvents()
+                refreshSpeechFacts()
+            }
+        }
         applyVisitSession()
         applyActionStatus()
+        renderSpeech()
     }
 
     override fun onStop() {
         VisitSession.setListener(null)
         ActionStatus.setListener(null)
+        SpeechSession.setListener(null)
         super.onStop()
     }
 
     override fun onResume() {
         super.onResume()
         refreshChrome()
+        refreshSpeechFacts()
         DaywireCore.whenReady(this) {
             if (isDestroyed) {
                 return@whenReady
             }
             refreshChrome()
             refreshEvents()
+            refreshSpeechFacts()
         }
     }
 
@@ -230,6 +267,7 @@ class MainActivity : AppCompatActivity() {
         binding.buttonNudge.isEnabled = ready && !ActionStatus.busy
         binding.buttonSynthetic.isEnabled = ready && !ActionStatus.busy
         binding.buttonRefresh.isEnabled = ready
+        renderSpeech()
         refreshFolder()
     }
 
@@ -355,6 +393,74 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }.start()
+    }
+
+    private var speechGeneration = 0
+
+    private fun refreshSpeechFacts() {
+        val generation = ++speechGeneration
+        val app = applicationContext
+        Thread {
+            val runtime = speechRuntimePackaged()
+            val embedding = SpeechAssets.has(app, SpeechAssets.EMBEDDING)
+            val segmentation = SpeechAssets.has(app, SpeechAssets.SEGMENTATION)
+            val english = SpeechAssets.present(app, SpeechAssets.englishStt)
+            val hebrew = SpeechAssets.present(app, SpeechAssets.hebrew)
+            val enrolled = if (!DaywireCore.isOpen()) {
+                null
+            } else {
+                try {
+                    DaywireCore.call(app) { core -> core.ownerEnrolled() }
+                } catch (error: Throwable) {
+                    null
+                }
+            }
+            runOnUiThread {
+                if (isDestroyed || generation != speechGeneration) {
+                    return@runOnUiThread
+                }
+                SpeechSession.setFacts(runtime, english, hebrew, embedding, segmentation, enrolled)
+            }
+        }.start()
+    }
+
+    private fun renderSpeech() {
+        val view = SpeechSession.view()
+        if (view.language == "he") {
+            if (!binding.speechHebrew.isChecked) {
+                binding.speechHebrew.isChecked = true
+            }
+        } else if (!binding.speechEnglish.isChecked) {
+            binding.speechEnglish.isChecked = true
+        }
+        val ready = DaywireCore.isOpen() && !view.busy
+        val known = view.runtime != null
+        binding.buttonSpeechEnroll.isEnabled = ready && view.runtime == true && view.embedding == true
+        binding.buttonSpeechProcess.isEnabled = ready &&
+            view.runtime == true &&
+            view.embedding == true &&
+            view.segmentation == true &&
+            view.enrolled == true
+        binding.buttonSpeechForget.isEnabled = ready
+        binding.speechEnglish.isEnabled = !view.busy
+        binding.speechHebrew.isEnabled = !view.busy
+        binding.textSpeechModels.text = when {
+            !known -> getString(R.string.speech_checking)
+            view.runtime != true -> getString(R.string.speech_runtime_missing) + " " + getString(R.string.speech_still_works)
+            view.embedding != true || view.segmentation != true ->
+                getString(R.string.speech_models_missing) + " " + getString(R.string.speech_still_works)
+            view.english != true && view.hebrew != true ->
+                getString(R.string.speech_models_missing) + " " + getString(R.string.speech_still_works)
+            view.english != true -> getString(R.string.speech_english_missing)
+            view.hebrew != true -> getString(R.string.speech_hebrew_card)
+            else -> getString(R.string.speech_models_ready)
+        }
+        binding.textSpeechOwner.text = when (view.enrolled) {
+            null -> getString(R.string.speech_enrollment_unknown)
+            true -> getString(R.string.speech_enrolled_yes)
+            false -> getString(R.string.speech_enrolled_no)
+        }
+        binding.textSpeechStatus.text = view.status.orEmpty()
     }
 
     private fun refreshEvents() {
