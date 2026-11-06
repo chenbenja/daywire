@@ -1,7 +1,9 @@
 package mobile_test
 
 import (
+	"encoding/binary"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -46,7 +48,38 @@ func TestBindSurfaceRoundTrip(t *testing.T) {
 	require.Equal(t, "Notification: Example Mail (com.example.mail), email", events[1].Summary)
 	require.Equal(t, "android:synthetic", events[2].SourceID)
 
+	require.NoError(t, core.SaveOwnerVoiceprint(packFloats([]float32{1, 0})))
+	enrolled, err := core.OwnerEnrolled()
+	require.NoError(t, err)
+	require.True(t, enrolled)
+	label, err := core.LabelOwner(packFloats([]float32{0, 1}))
+	require.NoError(t, err)
+	require.Equal(t, "other", label)
+	speechID, err := core.InsertSpeechTurn("he", "other", "Jane Doe synthetic turn", time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC).UnixMilli())
+	require.NoError(t, err)
+	require.NotEmpty(t, speechID)
+	notes, err := core.ListEventsJSON("note", 10)
+	require.NoError(t, err)
+	require.NotContains(t, notes, "Jane Doe")
+	require.NotContains(t, notes, speechID)
+	speechRows, err := core.ListEventsJSON("speech", 10)
+	require.NoError(t, err)
+	require.Contains(t, speechRows, speechID)
+	require.Contains(t, speechRows, "speech")
+	require.NoError(t, core.ForgetOwnerVoiceprint())
+	enrolled, err = core.OwnerEnrolled()
+	require.NoError(t, err)
+	require.False(t, enrolled)
+
 	require.NoError(t, core.Close())
 	_, err = core.ListEventsJSON("", 10)
 	require.Error(t, err)
+}
+
+func packFloats(vec []float32) []byte {
+	out := make([]byte, len(vec)*4)
+	for i, v := range vec {
+		binary.LittleEndian.PutUint32(out[i*4:], math.Float32bits(v))
+	}
+	return out
 }

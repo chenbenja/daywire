@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
 }
 
+val sherpaAar = file("libs/sherpa-onnx-1.12.28.aar")
+
 android {
     namespace = "com.chenbenja.daywire"
     compileSdk = 36
@@ -11,7 +13,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 1
-        versionName = "0.2.0"
+        versionName = "0.3.0"
         ndk {
             // Match hack/android-bind.sh. arm64-v8a is a phone, x86_64 is the emulator.
             abiFilters += listOf("arm64-v8a", "x86_64")
@@ -42,6 +44,17 @@ android {
             useLegacyPackaging = true
         }
     }
+
+    androidResources {
+        noCompress += listOf("onnx", "txt")
+    }
+
+    sourceSets.getByName("main") {
+        assets.srcDir("speech-assets")
+        if (sherpaAar.isFile) {
+            java.srcDir("src/speech/java")
+        }
+    }
 }
 
 dependencies {
@@ -52,6 +65,9 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation(files("libs/daywire.aar"))
+    if (sherpaAar.isFile) {
+        implementation(files(sherpaAar))
+    }
     testImplementation("junit:junit:4.13.2")
 }
 

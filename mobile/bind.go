@@ -66,6 +66,51 @@ func (c *Core) ListEventsJSON(eventType string, limit int) (string, error) {
 	return c.inner.ListEventsJSON(eventType, limit)
 }
 
+// SaveOwnerVoiceprint encrypts an embedding into speakers/owner.emb.
+// packed is little-endian float32 bits. The vector is not logged. A later
+// call replaces the file.
+func (c *Core) SaveOwnerVoiceprint(packed []byte) error {
+	if err := c.ready(); err != nil {
+		return err
+	}
+	return c.inner.SaveOwnerVoiceprint(packed)
+}
+
+// ForgetOwnerVoiceprint deletes the enrolled embedding. Missing is success.
+func (c *Core) ForgetOwnerVoiceprint() error {
+	if err := c.ready(); err != nil {
+		return err
+	}
+	return c.inner.ForgetOwnerVoiceprint()
+}
+
+// OwnerEnrolled reports whether an owner embedding is stored.
+func (c *Core) OwnerEnrolled() (bool, error) {
+	if err := c.ready(); err != nil {
+		return false, err
+	}
+	return c.inner.OwnerEnrolled()
+}
+
+// LabelOwner returns owner, other, or unknown for packed little-endian
+// float32 bits. The score is not returned.
+func (c *Core) LabelOwner(packed []byte) (string, error) {
+	if err := c.ready(); err != nil {
+		return "", err
+	}
+	return c.inner.LabelOwner(packed)
+}
+
+// InsertSpeechTurn stores one speaker-labeled transcript as a speech event.
+// It is not a note. language is en or he. label is owner, other, or unknown.
+// It does not take a file path or audio.
+func (c *Core) InsertSpeechTurn(language, label, text string, occurredUnixMilli int64) (string, error) {
+	if err := c.ready(); err != nil {
+		return "", err
+	}
+	return c.inner.InsertSpeechTurn(language, label, text, occurredUnixMilli)
+}
+
 // RecordLocalNudge stores a nudge shown by the phone's own notification.
 // It does not contact ntfy. delivered is false when the notification was not shown.
 func (c *Core) RecordLocalNudge(title, message string, delivered bool) (string, error) {

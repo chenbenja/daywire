@@ -16,3 +16,5 @@ data.key
 /android/**/*.iml
 /android/app/libs/*.aar
 /android/app/libs/*.jar
+/android/app/speech-assets/**
+!/android/app/speech-assets/.gitkeep

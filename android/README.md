@@ -9,6 +9,9 @@ From the repository root:
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
 ./hack/android-bind.sh
+./hack/fetch-speech-models.sh
 ```
 
-Then Android Studio → File → Open → this `android/` directory.
+The fetch is optional. Without it the app still opens and says speech models are not packaged. With it, enroll and process run on device. Speech uses its own file picker. The folder list still does not open files. Details are in [docs/poc-week3-speech.md](../docs/poc-week3-speech.md).
+
+Then Android Studio → File → Open → this `android/` directory. Re-sync Gradle after the fetch so the speech runtime is compiled in.

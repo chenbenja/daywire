@@ -1,6 +1,6 @@
 # Daywire Week 2 — Android shell
 
-**Status:** thin Kotlin shell over the Week 1 Go store, November 2026.
+**Status:** thin Kotlin shell over the Week 1 Go store, November 2026. Week 3 adds on-device speech in [poc-week3-speech.md](poc-week3-speech.md). This page is the Week 2 shell.
 
 Week 2 is an app Chen can open in Android Studio. The Week 1 store runs on the phone: summaries and nudge text are AES-256-GCM, and identifiers, types, times, and source ids stay plaintext. The database file is not whole-file encryption. The laptop MCP server is not in the APK, and the phone does not listen on a port. ntfy stays the laptop fallback. It is not used here, and the app does not request the internet permission.
 

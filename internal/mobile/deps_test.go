@@ -13,6 +13,8 @@ func TestMobileDepsExcludeSpeechAndServer(t *testing.T) {
 	for _, pkg := range []string{
 		"github.com/chenbenja/daywire/mobile",
 		"github.com/chenbenja/daywire/internal/mobile",
+		"github.com/chenbenja/daywire/internal/speech",
+		"github.com/chenbenja/daywire/internal/voiceprint",
 	} {
 		t.Run(pkg, func(t *testing.T) {
 			t.Parallel()

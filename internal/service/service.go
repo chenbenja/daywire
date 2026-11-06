@@ -31,7 +31,7 @@ type EventView struct {
 
 // QueryInput filters events by occurred_at.
 type QueryInput struct {
-	Type  string `json:"type,omitempty" jsonschema:"commitment, ask, visit, or note; omit for every type"`
+	Type  string `json:"type,omitempty" jsonschema:"commitment, ask, visit, or note; omit for every assistant-visible type. Speech turns are not included."`
 	Since string `json:"since,omitempty" jsonschema:"RFC3339 inclusive lower bound on occurred_at"`
 	Until string `json:"until,omitempty" jsonschema:"RFC3339 inclusive upper bound on occurred_at"`
 	Limit int    `json:"limit,omitempty" jsonschema:"maximum events; default 50, max 200"`
@@ -95,7 +95,7 @@ func (s *Service) Query(ctx context.Context, in QueryInput) (QueryOutput, error)
 	var typ event.Type
 	if strings.TrimSpace(in.Type) != "" {
 		typ = event.Type(strings.TrimSpace(in.Type))
-		if !typ.Valid() {
+		if !typ.AssistantVisible() {
 			return QueryOutput{}, fmt.Errorf("invalid event type")
 		}
 	}
@@ -111,10 +111,11 @@ func (s *Service) Query(ctx context.Context, in QueryInput) (QueryOutput, error)
 		return QueryOutput{}, fmt.Errorf("until is before since")
 	}
 	rows, err := s.store.ListByOccurred(ctx, store.OccurredFilter{
-		Type:  typ,
-		From:  from,
-		To:    to,
-		Limit: limit,
+		Type:      typ,
+		From:      from,
+		To:        to,
+		Limit:     limit,
+		Assistant: true,
 	})
 	if err != nil {
 		return QueryOutput{}, err
@@ -200,7 +201,7 @@ func (s *Service) Propose(ctx context.Context, in ProposeInput) (ProposeOutput, 
 }
 
 func (s *Service) poll(ctx context.Context, cursor store.Cursor, limit int) (SubscribeOutput, error) {
-	rows, err := s.store.ListSince(ctx, cursor, limit)
+	rows, err := s.store.ListAssistantSince(ctx, cursor, limit)
 	if err != nil {
 		return SubscribeOutput{}, err
 	}

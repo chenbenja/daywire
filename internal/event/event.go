@@ -9,7 +9,7 @@ import (
 	"unicode/utf8"
 )
 
-// Type is a semantic event kind assistants can filter on.
+// Type is a semantic event kind.
 type Type string
 
 const (
@@ -21,6 +21,10 @@ const (
 	TypeVisit Type = "visit"
 	// TypeNote is a short redacted reminder or observation.
 	TypeNote Type = "note"
+	// TypeSpeech is one on-device speaker turn. The phone UI can show it.
+	// Assistants cannot: query_events and subscribe omit this type. The
+	// summary is capped transcript text, not a redacted semantic fact.
+	TypeSpeech Type = "speech"
 )
 
 // MaxSummaryBytes is the largest redacted summary the store accepts.
@@ -28,9 +32,10 @@ const MaxSummaryBytes = 1024
 
 // Event is one redacted semantic fact.
 //
-// Summary is safe to show to an assistant. It is not a transcript and it is
-// not call audio. SourceID names the producer (for example synthetic:calendar),
-// not a raw payload.
+// Summary for commitment, ask, visit, and note is safe to show to an
+// assistant. A speech summary is capped transcript text for the phone UI
+// only. It is not call audio. SourceID names the producer (for example
+// synthetic:calendar or android:speech), not a file path.
 type Event struct {
 	ID         string
 	Type       Type
@@ -45,8 +50,14 @@ func ValidID(id string) bool {
 	return validToken(id, 64)
 }
 
-// Valid reports whether t is one of the Week 1 event types.
+// Valid reports whether the store accepts t.
 func (t Type) Valid() bool {
+	return t.AssistantVisible() || t == TypeSpeech
+}
+
+// AssistantVisible reports whether query_events and subscribe may return t.
+// Speech turns are stored for the phone and are not assistant-visible.
+func (t Type) AssistantVisible() bool {
 	switch t {
 	case TypeCommitment, TypeAsk, TypeVisit, TypeNote:
 		return true

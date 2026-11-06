@@ -72,12 +72,16 @@ type Store struct {
 }
 
 // OccurredFilter selects events by type and occurred_at.
-// Zero times are open bounds. Type empty matches every type.
+// Zero times are open bounds. Type empty matches every type, unless Assistant
+// is set, in which case speech turns are omitted.
 type OccurredFilter struct {
 	Type  event.Type
 	From  time.Time
 	To    time.Time
 	Limit int
+	// Assistant omits speech turns. query_events and subscribe set it.
+	// The phone UI leaves it false so Recent events can show transcripts.
+	Assistant bool
 }
 
 // Cursor is an exclusive lower bound on (created_at, id), in ascending order.
@@ -249,6 +253,9 @@ func (s *Store) ListByOccurred(ctx context.Context, f OccurredFilter) ([]event.E
 	if f.Type != "" {
 		q += ` AND type = ?`
 		args = append(args, string(f.Type))
+	} else if f.Assistant {
+		q += ` AND type != ?`
+		args = append(args, string(event.TypeSpeech))
 	}
 	if !f.From.IsZero() {
 		q += ` AND occurred_at >= ?`
@@ -264,8 +271,18 @@ func (s *Store) ListByOccurred(ctx context.Context, f OccurredFilter) ([]event.E
 }
 
 // ListSince returns events strictly after c, oldest created_at first.
-// The zero cursor starts at the beginning.
+// The zero cursor starts at the beginning. Speech turns are included.
 func (s *Store) ListSince(ctx context.Context, c Cursor, limit int) ([]event.Event, error) {
+	return s.listSince(ctx, c, limit, false)
+}
+
+// ListAssistantSince is ListSince without speech turns. Subscribe uses it so
+// a transcript cannot enter the assistant poll.
+func (s *Store) ListAssistantSince(ctx context.Context, c Cursor, limit int) ([]event.Event, error) {
+	return s.listSince(ctx, c, limit, true)
+}
+
+func (s *Store) listSince(ctx context.Context, c Cursor, limit int, assistant bool) ([]event.Event, error) {
 	if err := checkLimit(limit); err != nil {
 		return nil, err
 	}
@@ -284,10 +301,17 @@ func (s *Store) ListSince(ctx context.Context, c Cursor, limit int) ([]event.Eve
 	q := `
 		SELECT id, type, source_id, occurred_at, created_at, summary_nonce, summary_ct
 		FROM events
-		WHERE (? = 0 OR created_at > ? OR (created_at = ? AND id > ?))
+		WHERE (? = 0 OR created_at > ? OR (created_at = ? AND id > ?))`
+	args := []any{flag, micros, micros, id}
+	if assistant {
+		q += ` AND type != ?`
+		args = append(args, string(event.TypeSpeech))
+	}
+	q += `
 		ORDER BY created_at ASC, id ASC
 		LIMIT ?`
-	return s.queryEvents(ctx, q, flag, micros, micros, id, limit)
+	args = append(args, limit)
+	return s.queryEvents(ctx, q, args...)
 }
 
 // InsertNudge appends a delivery record. Detail is stored in the clear and

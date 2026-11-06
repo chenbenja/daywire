@@ -58,8 +58,12 @@ android)
 	# Separate from `all`: the AAR bind needs the Android SDK and gomobile.
 	"$root/hack/android-bind.sh"
 	;;
+speech-models)
+	# Separate from `all`: downloads pinned models. The phone does not.
+	"$root/hack/fetch-speech-models.sh"
+	;;
 *)
-	echo "usage: $0 {fmt|fmt-write|vet|test|build|speaker|android|all}" >&2
+	echo "usage: $0 {fmt|fmt-write|vet|test|build|speaker|android|speech-models|all}" >&2
 	exit 2
 	;;
 esac

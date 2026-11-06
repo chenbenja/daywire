@@ -26,8 +26,10 @@ const (
 // Core is an open on-device store. It does not listen on a port and it does
 // not import the MCP server.
 type Core struct {
-	store *store.Store
-	log   *slog.Logger
+	store   *store.Store
+	log     *slog.Logger
+	dataDir string
+	key     []byte
 }
 
 // Open opens or creates the store under dataDir. Summaries and nudge text are
@@ -60,7 +62,7 @@ func OpenWithLogger(dataDir string, logger *slog.Logger) (*Core, error) {
 		return nil, err
 	}
 	logger.Info("daywire core open", "key_source", cfg.KeySource)
-	return &Core{store: st, log: logger}, nil
+	return &Core{store: st, log: logger, dataDir: cfg.DataDir, key: cfg.DataKey}, nil
 }
 
 // Close closes the database.
@@ -70,6 +72,10 @@ func (c *Core) Close() error {
 	}
 	err := c.store.Close()
 	c.store = nil
+	for i := range c.key {
+		c.key[i] = 0
+	}
+	c.key = nil
 	if err != nil {
 		return fmt.Errorf("close core: %w", err)
 	}
@@ -136,9 +142,10 @@ func (c *Core) InsertCoarseVisit(latitude, longitude float64, occurredUnixMilli 
 	return c.insert(event.TypeVisit, visitSourceID, summary, occurredUnixMilli)
 }
 
-// ListEventsJSON returns redacted events as a JSON array, newest occurred_at
-// first. eventType empty matches every type. limit 0 uses 50. The maximum is
-// the store maximum.
+// ListEventsJSON returns events as a JSON array, newest occurred_at first.
+// eventType empty matches every type, including speech turns for the phone
+// UI. limit 0 uses 50. The maximum is the store maximum. This is not the
+// assistant query path.
 func (c *Core) ListEventsJSON(eventType string, limit int) (string, error) {
 	if err := c.ready(); err != nil {
 		return "", err
