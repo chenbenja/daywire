@@ -44,7 +44,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val speechMime = arrayOf("audio/wav", "audio/x-wav", "audio/wave", "audio/*")
+    private val speechMime = arrayOf(
+        "audio/*",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/wave",
+        "audio/mp4",
+        "audio/m4a",
+        "audio/x-m4a",
+        "audio/mpeg",
+        "audio/aac",
+        "audio/ogg",
+        "audio/flac",
+        "audio/3gpp",
+        "audio/amr",
+    )
 
     private val enrollAudio = registerForActivityResult(OpenSpeechDocument()) { uri ->
         if (uri == null) {

@@ -65,7 +65,7 @@
     <string name="nudge_permission_denied">Notification permission was not granted, so the sample nudge was not shown.</string>
 
     <string name="section_speech">Speech</string>
-    <string name="speech_help">Pick one 16 kHz mono PCM WAV at a time. Enrollment stores an encrypted voiceprint on this phone. Processing labels each turn owner, other, or unknown, then stores the words. There is no microphone, no call recording, and no upload. Choose English or Hebrew yourself.</string>
+    <string name="speech_help">Pick one audio file at a time. A voice memo or a WAV is converted to 16 kHz mono on this phone. Enrollment stores an encrypted voiceprint here. Processing labels each turn owner, other, or unknown, then stores the words. There is no microphone, no call recording, and no upload. Choose English or Hebrew yourself.</string>
     <string name="speech_english">English</string>
     <string name="speech_hebrew">Hebrew</string>
     <string name="speech_enroll">Enroll owner from a file</string>
@@ -96,7 +96,7 @@
     <string name="speech_no_speech">No speech found in that file.</string>
     <string name="speech_no_words">No words were recognized.</string>
     <string name="speech_short">That clip is shorter than half a second.</string>
-    <string name="speech_bad_wav">That file is not 16 kHz mono PCM WAV.</string>
+    <string name="speech_bad_wav">That audio file could not be decoded.</string>
     <string name="speech_read_failed">Could not read that audio file.</string>
     <string name="speech_failed">That did not work.</string>
 

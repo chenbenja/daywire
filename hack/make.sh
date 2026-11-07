@@ -23,6 +23,32 @@ fmt_write() {
 	files | xargs -0 gofmt -w
 }
 
+ensure_android_home() {
+	if [[ -z "${ANDROID_HOME:-}" && -z "${ANDROID_SDK_ROOT:-}" ]]; then
+		export ANDROID_HOME="${HOME}/Android/Sdk"
+	else
+		export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
+	fi
+	export ANDROID_SDK_ROOT="${ANDROID_HOME}"
+	export ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/28.2.13676358"
+	if [[ -z "${JAVA_HOME:-}" ]]; then
+		local java_bin
+		java_bin=$(command -v java || true)
+		if [[ -n "${java_bin}" ]]; then
+			java_bin=$(readlink -f "${java_bin}")
+			JAVA_HOME=$(dirname "$(dirname "${java_bin}")")
+			export JAVA_HOME
+		fi
+	fi
+}
+
+write_local_properties() {
+	local props escaped
+	props="${root}/android/local.properties"
+	escaped=$(printf '%s' "${ANDROID_HOME}" | sed -e 's/\\/\\\\/g' -e 's/:/\\:/g' -e 's/ /\\ /g')
+	printf 'sdk.dir=%s\n' "${escaped}" > "${props}"
+}
+
 case "${1:-all}" in
 fmt)
 	fmt_check
@@ -62,8 +88,31 @@ speech-models)
 	# Separate from `all`: downloads pinned models. The phone does not.
 	"$root/hack/fetch-speech-models.sh"
 	;;
+apk)
+	# Debug APK from a checkout: command-line SDK, pinned models, Go bind,
+	# unit tests, assembleDebug. Does not pass -tags speaker. `all` stays
+	# the laptop binary and does not download models.
+	ensure_android_home
+	status=0
+	"$root/hack/android-sdk.sh" &
+	pid_sdk=$!
+	"$root/hack/fetch-speech-models.sh" &
+	pid_fetch=$!
+	wait "${pid_sdk}" || status=$?
+	wait "${pid_fetch}" || status=$?
+	if [[ "${status}" -ne 0 ]]; then
+		exit "${status}"
+	fi
+	"$root/hack/android-bind.sh"
+	write_local_properties
+	(
+		cd "${root}/android"
+		./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
+	)
+	echo "debug APK: ${root}/android/app/build/outputs/apk/debug/app-debug.apk"
+	;;
 *)
-	echo "usage: $0 {fmt|fmt-write|vet|test|build|speaker|android|speech-models|all}" >&2
+	echo "usage: $0 {fmt|fmt-write|vet|test|build|speaker|android|speech-models|apk|all}" >&2
 	exit 2
 	;;
 esac

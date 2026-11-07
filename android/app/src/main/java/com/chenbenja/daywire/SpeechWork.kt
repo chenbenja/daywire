@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
-import java.io.FileInputStream
 import java.util.concurrent.Executors
 
 internal class OpenSpeechDocument : ActivityResultContracts.OpenDocument() {
@@ -84,12 +83,11 @@ internal object SpeechWork {
         if (!SpeechAssets.present(context, listOf(SpeechAssets.EMBEDDING))) {
             return context.getString(R.string.speech_models_missing)
         }
-        val staged = stage(context, uri, enrollBytes())
+        val staged = stage(context, uri, stageBudget(MAX_ENROLL_SECONDS))
         try {
-            FileInputStream(staged.file).use { input ->
-                val wav = PcmWav(input)
-                val samples = wav.readSamples(sampleCount(MAX_ENROLL_SECONDS))
-                val more = wav.readSamples(1).isNotEmpty() || staged.trimmed
+            openSpeechSamples(staged.file).use { audio ->
+                val samples = audio.readSamples(sampleCount(MAX_ENROLL_SECONDS))
+                val more = audio.readSamples(1).isNotEmpty() || staged.trimmed
                 if (samples.size < sampleCount(MIN_EMBED_SECONDS)) {
                     return context.getString(R.string.speech_short)
                 }
@@ -131,10 +129,9 @@ internal object SpeechWork {
         if (!enrolled) {
             return context.getString(R.string.speech_none)
         }
-        val staged = stage(context, uri, processBytes())
+        val staged = stage(context, uri, stageBudget(MAX_PROCESS_SECONDS))
         try {
-            FileInputStream(staged.file).use { input ->
-                val wav = PcmWav(input)
+            openSpeechSamples(staged.file).use { audio ->
                 val started = System.currentTimeMillis()
                 var origin = 0
                 var stored = 0
@@ -146,7 +143,7 @@ internal object SpeechWork {
                     openSpeechModels(context, language).use { models ->
                         while (origin < maxSamples) {
                             val want = minOf(windowSamples, maxSamples - origin)
-                            val window = wav.readSamples(want)
+                            val window = audio.readSamples(want)
                             if (window.isEmpty()) {
                                 break
                             }
@@ -183,7 +180,7 @@ internal object SpeechWork {
                     }
                     throw error
                 }
-                val trimmed = staged.trimmed || (origin >= maxSamples && !wav.exhausted())
+                val trimmed = staged.trimmed || (origin >= maxSamples && !audio.exhausted())
                 Trace.info("speech process ok language=$language turns=$stored")
                 if (stored == 0) {
                     return if (sawTurn) {
@@ -290,12 +287,11 @@ internal object SpeechWork {
         return context.getString(R.string.speech_failed)
     }
 
-    private fun enrollBytes(): Long {
-        return sampleCount(MAX_ENROLL_SECONDS).toLong() * 2L + 65_536L
-    }
-
-    private fun processBytes(): Long {
-        return sampleCount(MAX_PROCESS_SECONDS).toLong() * 2L + 65_536L
+    private fun stageBudget(seconds: Double): Long {
+        // Enough for 48 kHz stereo 16-bit of that duration, plus a container
+        // header. A phone recording is smaller than this. A higher-rate
+        // uncompressed file can still be cut here.
+        return (seconds * 48_000 * 2 * 2).toLong() + 2L * 1024L * 1024L
     }
 
     private class Staged(val file: File, val trimmed: Boolean)
