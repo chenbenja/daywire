@@ -78,7 +78,14 @@ export PATH="${wrap}:${PATH}"
 # duration of the bind and restores it on the way out. The laptop binary
 # does not see the patch. The pinned hash is syscall_musl.go from
 # modernc.org/libc v1.79.0.
+# A fresh module cache has the sum but not the unpacked tree, so
+# `go list -m -f {{.Dir}}` is empty until this download.
+go mod download modernc.org/libc
 libc_dir=$(go list -m -f '{{.Dir}}' modernc.org/libc)
+if [[ -z "${libc_dir}" || ! -f "${libc_dir}/syscall_musl.go" ]]; then
+	echo "modernc.org/libc source was not unpacked" >&2
+	exit 1
+fi
 libc_sys="${libc_dir}/syscall_musl.go"
 libc_want="20599ae6a0036b36e28b6794aa32321ffea6aa2fd88775d1b7d7ff32afd25b07"
 libc_got=$(sha256sum "${libc_sys}" | awk '{print $1}')

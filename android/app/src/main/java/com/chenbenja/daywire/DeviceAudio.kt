@@ -81,10 +81,9 @@ internal class DeviceAudio(file: File) : SpeechSamples {
         while (filled < maxSamples) {
             val conv = rate
             if (conv != null) {
-                val pulled = conv.pull(maxSamples - filled)
-                if (pulled.isNotEmpty()) {
-                    pulled.copyInto(out, filled)
-                    filled += pulled.size
+                val got = conv.fill(out, filled, maxSamples - filled)
+                if (got > 0) {
+                    filled += got
                     stalls = 0
                     continue
                 }

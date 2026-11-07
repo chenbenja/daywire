@@ -1,5 +1,6 @@
 package com.chenbenja.daywire
 
+import java.io.BufferedInputStream
 import java.io.Closeable
 import java.io.EOFException
 import java.io.InputStream
@@ -14,15 +15,21 @@ import kotlin.math.min
  * accepted. Other encodings are rejected so the caller can try a compressed
  * decoder. Samples are scaled to about [-1, 1], matching the laptop spike.
  */
-internal class PcmWav(private val input: InputStream) : Closeable, SpeechSamples {
+internal class PcmWav(raw: InputStream) : Closeable, SpeechSamples {
+    private val input = if (raw is BufferedInputStream) raw else BufferedInputStream(raw, 64 * 1024)
     private val channels: Int
     private val bytesPerSample: Int
     private val frameBytes: Int
     private val floatFormat: Boolean
     private var dataRemaining: Long = 0
+    private val blockBytes: ByteArray
     private val rate: ToSpeechRate
     private var sourceDone = false
     private var closed = false
+
+    /** How many times the resampler was asked to fill. A per-frame loop is huge. */
+    val resamplerFills: Int
+        get() = rate.fillCalls
 
     init {
         val riff = readFully(12)
@@ -97,6 +104,7 @@ internal class PcmWav(private val input: InputStream) : Closeable, SpeechSamples
         bytesPerSample = width
         frameBytes = channelCount * width
         floatFormat = format == 3
+        blockBytes = ByteArray(BLOCK_FRAMES * frameBytes)
         rate = ToSpeechRate(sampleRate)
     }
 
@@ -118,19 +126,14 @@ internal class PcmWav(private val input: InputStream) : Closeable, SpeechSamples
         val out = FloatArray(maxSamples)
         var filled = 0
         while (filled < maxSamples) {
-            val pulled = rate.pull(maxSamples - filled)
-            if (pulled.isNotEmpty()) {
-                pulled.copyInto(out, filled)
-                filled += pulled.size
+            val got = rate.fill(out, filled, maxSamples - filled)
+            if (got > 0) {
+                filled += got
                 continue
             }
-            if (!feedFrame()) {
-                val tail = rate.pull(maxSamples - filled)
-                if (tail.isEmpty()) {
-                    break
-                }
-                tail.copyInto(out, filled)
-                filled += tail.size
+            if (feedBlock(rate.sourceSamplesFor(maxSamples - filled)) == 0) {
+                filled += rate.fill(out, filled, maxSamples - filled)
+                break
             }
         }
         return if (filled == maxSamples) out else out.copyOf(filled)
@@ -143,21 +146,33 @@ internal class PcmWav(private val input: InputStream) : Closeable, SpeechSamples
         }
     }
 
-    private fun feedFrame(): Boolean {
-        if (sourceDone || dataRemaining < frameBytes) {
+    private fun feedBlock(wantFrames: Int): Int {
+        if (sourceDone) {
+            return 0
+        }
+        val available = (dataRemaining / frameBytes).toInt()
+        if (available <= 0 || wantFrames <= 0) {
             finishSource()
-            return false
+            return 0
         }
-        val raw = readFully(frameBytes)
-        dataRemaining -= frameBytes.toLong()
-        var sum = 0.0
-        var channel = 0
-        while (channel < channels) {
-            sum += decodeSample(raw, channel * bytesPerSample).toDouble()
-            channel++
+        val frames = min(wantFrames, min(BLOCK_FRAMES, available))
+        val nbytes = frames * frameBytes
+        readFullyInto(blockBytes, nbytes)
+        dataRemaining -= nbytes.toLong()
+        var at = 0
+        var frame = 0
+        while (frame < frames) {
+            var sum = 0.0
+            var channel = 0
+            while (channel < channels) {
+                sum += decodeSample(blockBytes, at).toDouble()
+                at += bytesPerSample
+                channel++
+            }
+            rate.add((sum / channels).toFloat())
+            frame++
         }
-        rate.add((sum / channels).toFloat())
-        return true
+        return frames
     }
 
     private fun finishSource() {
@@ -205,6 +220,11 @@ internal class PcmWav(private val input: InputStream) : Closeable, SpeechSamples
 
     private fun readFully(n: Int): ByteArray {
         val buf = ByteArray(n)
+        readFullyInto(buf, n)
+        return buf
+    }
+
+    private fun readFullyInto(buf: ByteArray, n: Int) {
         var off = 0
         try {
             while (off < n) {
@@ -219,7 +239,6 @@ internal class PcmWav(private val input: InputStream) : Closeable, SpeechSamples
         } catch (error: Exception) {
             throw SpeechInputException(SpeechInputKind.BAD_WAV)
         }
-        return buf
     }
 
     private fun skipFully(n: Long) {
@@ -267,22 +286,39 @@ internal class ToSpeechRate(private val inRate: Int) {
         ended = true
     }
 
+    /** Times [fill] was entered. Tests reject a once-per-source-frame loop. */
+    var fillCalls: Int = 0
+        private set
+
     fun canPull(): Boolean = nextSample() != null
 
-    fun pull(max: Int): FloatArray {
-        if (max <= 0) {
-            return FloatArray(0)
+    /** How many source samples to feed before another [outCount] outputs can exist. */
+    fun sourceSamplesFor(outCount: Int): Int {
+        if (outCount <= 0) {
+            return 1
         }
-        val out = FloatArray(max)
+        val need = ceil(outCount * step).toInt() + 2
+        return if (need < 1) 1 else need
+    }
+
+    /**
+     * Writes up to [max] samples into [dest] at [offset]. Returns how many
+     * were written. Does not allocate an output buffer.
+     */
+    fun fill(dest: FloatArray, offset: Int, max: Int): Int {
+        fillCalls++
+        if (max <= 0) {
+            return 0
+        }
         var n = 0
         while (n < max) {
             val sample = nextSample() ?: break
-            out[n] = sample
+            dest[offset + n] = sample
             n++
             pos += step
             discard()
         }
-        return if (n == max) out else out.copyOf(n)
+        return n
     }
 
     private fun have(): Int = base + samples.size
@@ -330,6 +366,7 @@ internal class ToSpeechRate(private val inRate: Int) {
     }
 }
 
+private const val BLOCK_FRAMES = 4096
 private const val WAVE_EXTENSIBLE = 0xFFFE
 
 private fun extensibleFormat(payload: ByteArray): Int {

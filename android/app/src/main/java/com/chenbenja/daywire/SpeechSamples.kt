@@ -1,5 +1,6 @@
 package com.chenbenja.daywire
 
+import java.io.BufferedInputStream
 import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
@@ -24,7 +25,7 @@ internal interface SpeechSamples : Closeable {
  * There is no microphone capture.
  */
 internal fun openSpeechSamples(file: File): SpeechSamples {
-    val input = FileInputStream(file)
+    val input = BufferedInputStream(FileInputStream(file), 64 * 1024)
     try {
         return PcmWav(input)
     } catch (error: SpeechInputException) {

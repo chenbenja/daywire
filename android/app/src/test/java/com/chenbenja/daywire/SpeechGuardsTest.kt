@@ -156,6 +156,36 @@ class SpeechGuardsTest {
     }
 
     @Test
+    fun aSecondOfAudioDoesNotResampleOncePerFrame() {
+        val n = SPEECH_SAMPLE_RATE
+        val pcm = wav(ShortArray(n) { 16384 })
+        PcmWav(ByteArrayInputStream(pcm)).use { reader ->
+            val samples = reader.readSamples(n)
+            assertEquals(n, samples.size)
+            assertEquals(0.5f, samples[0], 1e-4f)
+            assertEquals(0.5f, samples[n - 1], 1e-4f)
+            assertTrue(reader.exhausted())
+            // One fill per source frame allocated a FloatArray the size of
+            // everything still requested. A 1 s clip is 16000 frames.
+            assertTrue(reader.resamplerFills < n / 32)
+        }
+    }
+
+    @Test
+    fun aSecondAt48kDoesNotResampleOncePerFrame() {
+        val n = 48_000
+        val pcm = wav(ShortArray(n) { 16384 }, rate = 48000)
+        PcmWav(ByteArrayInputStream(pcm)).use { reader ->
+            val samples = reader.readSamples(SPEECH_SAMPLE_RATE)
+            assertEquals(SPEECH_SAMPLE_RATE, samples.size)
+            assertEquals(0.5f, samples[0], 1e-4f)
+            assertEquals(0.5f, samples[samples.size - 1], 1e-4f)
+            assertTrue(reader.exhausted())
+            assertTrue(reader.resamplerFills < n / 32)
+        }
+    }
+
+    @Test
     fun pcmWavRejectsNonPcm() {
         assertThrows(SpeechInputException::class.java) {
             PcmWav(ByteArrayInputStream(wav(shortArrayOf(0), format = 7))).use { }
