@@ -4,7 +4,7 @@
 
 Daywire is an open-source, phone-first life-context bridge. It turns the day into redacted semantic events and hands those events to the assistant you already use.
 
-**Status:** Week 1 localhost Go core, a Week 2 Android shell, and Week 3 on-device speech. The laptop process binds to loopback, stores redacted events in SQLite, and speaks MCP. The phone app stores the same events on the device. It can enroll an owner voice from a picked WAV, forget that enrollment, and write speaker-labeled text from another picked WAV. Audio does not leave the phone. A laptop speaker-identification spike (`./hack/make.sh speaker`) still exists behind a separate build.
+**Status:** Week 1 localhost Go core, a Week 2 Android shell, and Week 3 on-device speech. The laptop process binds to loopback, stores redacted events in SQLite, and speaks MCP. The phone app stores the same events on the device. It can enroll an owner voice from a picked audio file, forget that enrollment, and write speaker-labeled text from another picked file. Audio does not leave the phone. A laptop speaker-identification spike (`./hack/make.sh speaker`) still exists behind a separate build.
 
 **License:** TBD
 
@@ -36,21 +36,23 @@ That build downloads the pinned models into `output/speaker-models/` (gitignored
 
 ## Week 2 Android shell
 
-`android/` is a project Android Studio can open. Summaries and nudge text are AES-256-GCM on the phone; identifiers, types, times, and source names stay readable, and the database file is not encrypted as a whole. The key is a file in app-private storage, not the Android Keystore. The app asks before reading notifications or location, lists a folder you pick, and shows nudges with the phone's own notifications. ntfy is not used on the phone.
+`android/` is the phone app. Summaries and nudge text are AES-256-GCM on the phone; identifiers, types, times, and source names stay readable, and the database file is not encrypted as a whole. The key is a file in app-private storage, not the Android Keystore. The app asks before reading notifications or location, lists a folder you pick, and shows nudges with the phone's own notifications. ntfy is not used on the phone.
 
 ## Week 3 on-device speech
 
-The same app enrolls an owner voiceprint from one picked 16 kHz mono PCM WAV, can forget it, and processes another picked file on the phone: 10 second windows, pyannote segmentation, NeMo SpeakerNet, cosine owner/other/unknown, then Moonshine tiny English or the ivrit-ai Hebrew Zipformer. Turns are stored as `speech` events the phone can show. Assistants do not receive them. There is no microphone and no `INTERNET` permission. Models are fetched at build time:
+The same app enrolls an owner voiceprint from one picked audio file, can forget it, and processes another picked file on the phone: the file is converted to 16 kHz mono, then 10 second windows, pyannote segmentation, NeMo SpeakerNet, cosine owner/other/unknown, then Moonshine tiny English or the ivrit-ai Hebrew Zipformer. A voice memo or a WAV both work. Turns are stored as `speech` events the phone can show. Assistants do not receive them. There is no microphone and no `INTERNET` permission. Models are packaged when the APK is built. The phone does not download them.
+
+Debug APK, from a clean checkout, without Android Studio:
 
 ```bash
-./hack/fetch-speech-models.sh
-export ANDROID_HOME="$HOME/Android/Sdk"   # Android Studio's SDK path
-./hack/android-bind.sh
+./hack/make.sh apk
 ```
 
-Details, licences, and SHA-256 pins are in [docs/poc-week3-speech.md](docs/poc-week3-speech.md).
+That writes `android/app/build/outputs/apk/debug/app-debug.apk`. On Linux, when `ANDROID_HOME` is unset, it installs the command-line SDK under `$HOME/Android/Sdk` (platform 36, build-tools 36.0.0, NDK 28.2.13676358). It then fetches the pinned models, binds the Go archive, runs the Android unit tests, and assembles the debug APK. Needs Go 1.26, JDK 17 or newer, curl, and unzip. Set `ANDROID_HOME` to use an SDK you already have.
 
-Open the project only after the Go archive exists. Then in Android Studio: File → Open → the `android/` directory. The click-by-click for notification access, location, and the folder picker is in [docs/poc-week2-android.md](docs/poc-week2-android.md).
+The APK installs on Android 10 or newer (`minSdk` 29) arm64 phones, and on x86_64 emulators. A 32-bit-only phone is not supported. Sideload steps, including Android 13+ notification access, are in [docs/poc-week2-android.md](docs/poc-week2-android.md). Speech licences, the public sample clips, and what the screen does are in [docs/poc-week3-speech.md](docs/poc-week3-speech.md).
+
+Android Studio can still open `android/` after `./hack/make.sh android` and `./hack/make.sh speech-models`. It is optional.
 
 ## Build
 
@@ -60,7 +62,7 @@ Requires Go 1.26 (the `go` directive in `go.mod`; the toolchain downloads it whe
 ./hack/make.sh all
 ```
 
-That runs `gofmt -l`, `go vet`, `go test -race ./...`, and writes `output/daywire` with `CGO_ENABLED=0`. The Makefile calls the same script: `make all`, `make test`, `make build`. `./hack/make.sh speaker` is the opt-in sherpa build (`output/daywire-speaker`).
+That runs `gofmt -l`, `go vet`, `go test -race ./...`, and writes `output/daywire` with `CGO_ENABLED=0`. It does not download speech models and it does not build the APK. The Makefile calls the same script: `make all`, `make test`, `make build`, `make apk`. `./hack/make.sh speaker` is the opt-in sherpa build (`output/daywire-speaker`). `./hack/make.sh apk` is the debug APK described above.
 
 ## Run
 

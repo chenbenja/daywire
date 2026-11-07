@@ -2,7 +2,7 @@
 
 **Status:** thin Kotlin shell over the Week 1 Go store, November 2026. Week 3 adds on-device speech in [poc-week3-speech.md](poc-week3-speech.md). This page is the Week 2 shell.
 
-Week 2 is an app Chen can open in Android Studio. The Week 1 store runs on the phone: summaries and nudge text are AES-256-GCM, and identifiers, types, times, and source ids stay plaintext. The database file is not whole-file encryption. The laptop MCP server is not in the APK, and the phone does not listen on a port. ntfy stays the laptop fallback. It is not used here, and the app does not request the internet permission.
+Week 2 is a phone app. The debug APK is built from the command line; Android Studio is optional. The Week 1 store runs on the phone: summaries and nudge text are AES-256-GCM, and identifiers, types, times, and source ids stay plaintext. The database file is not whole-file encryption. The laptop MCP server is not in the APK, and the phone does not listen on a port. ntfy stays the laptop fallback. It is not used here, and the app does not request the internet permission.
 
 Speech-to-text, speaker identification, and call audio are not this slice. The folder picker is only a capture hook for a later week.
 
@@ -19,7 +19,7 @@ Speech-to-text, speaker identification, and call audio are not this slice. The f
 | Folder hook | `FolderStore` | Storage Access Framework tree. Top-level names only, capped at 200. File bytes are not opened. |
 | Nudge | `LocalNudge` | `NotificationCompat` on this phone. The store channel is `local`. Nothing is posted to ntfy. |
 
-`./hack/make.sh all` is unchanged: `gofmt`, `go vet`, `go test -race`, and a `CGO_ENABLED=0` laptop binary. It does not build the APK. `./hack/make.sh android` is the bind script only.
+`./hack/make.sh all` is unchanged: `gofmt`, `go vet`, `go test -race`, and a `CGO_ENABLED=0` laptop binary. It does not build the APK. `./hack/make.sh android` is the bind script only. `./hack/make.sh apk` is the one-command debug APK.
 
 ## Redaction
 
@@ -59,41 +59,63 @@ From Android 10 onward, an ordinary app cannot record both sides of a phone call
 
 The supported hook is the Storage Access Framework. If the phone's own dialer or recorder already writes files into a folder, the user can grant Daywire that folder. Week 2 lists the names at the top of the folder. It does not open the files, does not run speech-to-text, and does not build a voiceprint. Where the OEM puts those files varies (`Recordings/Call`, `Sounds/Call`, and other names). Daywire does not scan the disk for them. The user picks the folder.
 
-## Open the project
+## Build the debug APK
 
-You need Go 1.26 (the same toolchain as the laptop build; `GOTOOLCHAIN=auto` downloads it) and Android Studio with JDK 17. The Gradle project uses Android Gradle Plugin 9.5.1, Gradle 9.6, `compileSdk` 36, and `minSdk` 29 (Android 10).
+You need Go 1.26 (the same toolchain as the laptop build; `GOTOOLCHAIN=auto` downloads it), JDK 17 or newer, curl, and unzip. Android Studio is not required. The Gradle project uses Android Gradle Plugin 9.5.1, Gradle 9.6, `compileSdk` 36, `ndkVersion` 28.2.13676358, and `minSdk` 29 (Android 10).
 
-1. Install [Android Studio](https://developer.android.com/studio). On first launch, finish the setup wizard so it installs the Android SDK. If it asks for an SDK platform, install **Android API 36**. Build-tools 36 are pulled in by the Gradle build.
-2. Note the SDK path. Studio shows it under Settings → Languages & Frameworks → Android SDK. It is often `$HOME/Android/Sdk`.
-3. From the repository root:
+From the repository root:
 
 ```bash
-export ANDROID_HOME="$HOME/Android/Sdk"
-./hack/android-bind.sh
+./hack/make.sh apk
 ```
 
-The script always reinstalls the module's `gomobile` and `gobind` into `output/android-bind-bin` (gitignored), then writes `android/app/libs/daywire.aar` only after checking the archive for speech libraries. That archive is gitignored. Re-run the script when the Go API changes. The bind needs an NDK: in the SDK manager, install **NDK (Side by side)**. Android Gradle Plugin 9.5's default is 28.2.13676358. The bind targets are arm64 (phones) and amd64 (the usual emulator). A 32-bit device needs `android/arm` or `android/386` added to `-target` in `hack/android-bind.sh`. The Gradle wrapper jar in this repo is not checksum-verified in this slice.
+On Linux, when `ANDROID_HOME` is unset, that installs the command-line SDK at `$HOME/Android/Sdk`: platform 36, build-tools 36.0.0, NDK 28.2.13676358, and platform-tools (`adb`). Set `ANDROID_HOME` first if the SDK should live somewhere else, or if you already installed those packages. The same command fetches the pinned speech models (see [poc-week3-speech.md](poc-week3-speech.md)), binds `android/app/libs/daywire.aar`, runs `:app:testDebugUnitTest`, and assembles the debug APK:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+The bind always reinstalls the module's `gomobile` and `gobind` into `output/android-bind-bin` (gitignored), then writes `daywire.aar` only after checking the archive for speech libraries. That archive is gitignored. The bind targets are arm64 (phones) and amd64 (the usual emulator). The APK's native libraries are `arm64-v8a` and `x86_64` only. A 32-bit-only phone will not install it. Adding `android/arm` or `android/386` to `-target` in `hack/android-bind.sh` would be a separate change; it is not done here. The Gradle wrapper jar in this repo is not checksum-verified in this slice.
 
 `go.mod` records `gobind` as a Go tool (`tool golang.org/x/mobile/cmd/gobind`). That is how Go 1.26's gomobile finds the binder. It is not linked into the laptop `daywire` binary. The bind script also forces that Go 1.26 toolchain to stay local: current gomobile writes a patchless `go 1.26` line, and `GOTOOLCHAIN=auto` would then look for a release named `go1.26`, which does not exist.
 
-4. Android Studio → File → Open → select the `android/` directory (not the repository root). Trust the Gradle project. The first sync downloads Gradle 9.6 and the AndroidX libraries.
-5. If Gradle says `Missing app/libs/daywire.aar`, the bind script has not been run, or `ANDROID_HOME` was unset when it ran.
-6. Choose a device: a phone with USB debugging, or an emulator whose image is **arm64** or **x86_64**. Run the `app` configuration.
+`./hack/make.sh android` is still bind-only. `./hack/make.sh speech-models` is still the model fetch. Use those when you only need one step.
 
-Command-line build, after the bind:
+Android Studio remains optional. To open the project there: install the SDK (or use the one `./hack/make.sh apk` wrote), run the bind, then File → Open → the `android/` directory (not the repository root). If Gradle says `Missing app/libs/daywire.aar`, the bind has not been run. A device image must be **arm64** or **x86_64**.
+
+Checked with `./hack/make.sh all` and `./hack/make.sh apk` on the command-line SDK (platform 36, build-tools 36.0.0, NDK 28.2.13676358). The debug APK's `minSdk` is 29 and its native code is `arm64-v8a` and `x86_64`. It requests notification-post and approximate location, plus the AndroidX signature permission for non-exported receivers. It does not request internet, microphone, or call capture. English and Hebrew model files are in the APK. `daywire.aar` has no sherpa or onnxruntime.
+
+An Android 14 (`google_apis` x86_64) emulator did boot here. The debug APK installed, a cold start left the process running, and the screen said **Store is open on this phone.** The speech card said **English and Hebrew speech models are packaged.** Notification, location, folder, and speech buttons were not tapped. A physical phone was not used. The first emulator launch crashed in the store thread: Android's x86_64 seccomp filter rejects the legacy `lstat` syscall that modernc's musl port uses. `hack/android-bind.sh` rewrites those x86_64 calls to the `*at` forms for the duration of the bind. arm64 already uses those forms.
+
+## Install on a phone
+
+The phone must run Android 10 or newer and be 64-bit ARM (arm64). Most phones from the last several years are. A 32-bit-only phone will refuse the install. This is a debug APK signed with the debug key. It is installed by you, on your phone. It is not a Play Store listing.
+
+### Copy the file and tap it
+
+1. Copy `app-debug.apk` onto the phone (USB file transfer, or any private copy you already trust). Do not publish it.
+2. On the phone, open the APK from the Files app or the download notification.
+3. If Android blocks it, go to Settings and allow that app (Files, Chrome, or whichever one you used) to install unknown apps. The screen is often Settings → Apps → Special app access → Install unknown apps.
+4. Confirm the install and open Daywire.
+
+### Or use adb
+
+1. On the phone: Settings → About phone → tap **Build number** seven times. That unlocks Developer options.
+2. Settings → Developer options → turn on **USB debugging**.
+3. Plug the phone into the computer and accept the "Allow USB debugging" prompt.
+4. From the repository root, with platform-tools on `PATH` (`$HOME/Android/Sdk/platform-tools` after `./hack/make.sh apk`):
 
 ```bash
-cd android
-./gradlew :app:assembleDebug
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The debug APK is `android/app/build/outputs/apk/debug/app-debug.apk`.
+`adb devices` should list the phone as `device` before that. If it says `unauthorized`, unlock the phone and accept the prompt.
 
-Checked on this branch: `./hack/make.sh all` passes; `./hack/android-bind.sh` writes an AAR whose native libraries are `arm64-v8a` and `x86_64` and which does not contain sherpa or onnxruntime; `./gradlew :app:testDebugUnitTest :app:assembleDebug` succeeds against SDK platform 36, build-tools 36.0.0, and NDK 28.2.13676358. The resulting APK requests notification-post and approximate-location only. It does not request the internet permission. An emulator was not started, so the buttons were not clicked through on a device.
+The store line should say the store is open once the background open finishes. Events live in the app's private no-backup directory (`no_backup/store/events.db` and `data.key` inside the app sandbox). Backup to the cloud is off. `data.key` is a raw 32-byte key file next to the database, protected by the app sandbox and file-based encryption. It is not wrapped in the Android Keystore. A debug build is debuggable, so `adb shell run-as com.chenbenja.daywire` can read both `no_backup/store/data.key` and `events.db`. The key rules otherwise match Week 1: the file is generated unless `DAYWIRE_DATA_KEY` or `DAYWIRE_DATA_KEY_FILE` is set, which they are not on a phone.
 
 ## On a phone
 
-Install the debug build and open Daywire. The store line should say the store is open once the background open finishes. Events live in the app's private no-backup directory (`no_backup/store/events.db` and `data.key` inside the app sandbox). Backup to the cloud is off. `data.key` is a raw 32-byte key file next to the database, protected by the app sandbox and file-based encryption. It is not wrapped in the Android Keystore. A debug build is debuggable, so `adb shell run-as com.chenbenja.daywire` can read both `no_backup/store/data.key` and `events.db`. The key rules otherwise match Week 1: the file is generated unless `DAYWIRE_DATA_KEY` or `DAYWIRE_DATA_KEY_FILE` is set, which they are not on a phone.
+Open Daywire after the install above.
 
 ### Notification access
 

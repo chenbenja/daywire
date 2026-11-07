@@ -7,6 +7,7 @@ val sherpaAar = file("libs/sherpa-onnx-1.12.28.aar")
 android {
     namespace = "com.chenbenja.daywire"
     compileSdk = 36
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "com.chenbenja.daywire"
@@ -50,9 +51,12 @@ android {
     }
 
     sourceSets.getByName("main") {
-        assets.srcDir("speech-assets")
+        assets.directories.add("speech-assets")
         if (sherpaAar.isFile) {
-            java.srcDir("src/speech/java")
+            // AGP 9 compiles Kotlin only from the kotlin source set. These
+            // files are .kt even though the directory is named java.
+            java.directories.add("src/speech/java")
+            kotlin.directories.add("src/speech/java")
         }
     }
 }

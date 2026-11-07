@@ -11,7 +11,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 
 if [[ -z "${ANDROID_HOME:-}" && -z "${ANDROID_SDK_ROOT:-}" ]]; then
-	echo "Set ANDROID_HOME to the Android SDK (Android Studio: Settings, Languages & Frameworks, Android SDK)." >&2
+	echo "Set ANDROID_HOME to the Android SDK, or run ./hack/make.sh apk to install the command-line SDK and build the debug APK." >&2
 	exit 1
 fi
 export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
@@ -33,7 +33,7 @@ GOBIN="${bindbin}" go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobi
 export PATH="${bindbin}:${gopath}/bin:${PATH}"
 
 if [[ ! -d "${ANDROID_HOME}/ndk" && ! -d "${ANDROID_HOME}/ndk-bundle" && -z "${ANDROID_NDK_HOME:-}" ]]; then
-	echo "No Android NDK found under ANDROID_HOME. In Android Studio's SDK manager, install NDK (Side by side). The current plugin default is 28.2.13676358." >&2
+	echo "No Android NDK found under ANDROID_HOME. Install NDK 28.2.13676358 (side by side), or run ./hack/make.sh apk." >&2
 	exit 1
 fi
 
@@ -69,6 +69,35 @@ shell_quote() {
 } > "${wrap}/go"
 chmod +x "${wrap}/go"
 export PATH="${wrap}:${PATH}"
+
+# modernc's musl port issues legacy x86_64 syscalls (lstat, stat, open).
+# Android's app seccomp filter kills those with SIGSYS, so the emulator
+# crashes while opening the store. The Go overlay flag refuses to replace
+# a file inside the module cache, and a workspace replace hides gomobile's
+# temporary module, so this bind patches the extracted source for the
+# duration of the bind and restores it on the way out. The laptop binary
+# does not see the patch. The pinned hash is syscall_musl.go from
+# modernc.org/libc v1.79.0.
+# A fresh module cache has the sum but not the unpacked tree, so
+# `go list -m -f {{.Dir}}` is empty until this download.
+go mod download modernc.org/libc
+libc_dir=$(go list -m -f '{{.Dir}}' modernc.org/libc)
+if [[ -z "${libc_dir}" || ! -f "${libc_dir}/syscall_musl.go" ]]; then
+	echo "modernc.org/libc source was not unpacked" >&2
+	exit 1
+fi
+libc_sys="${libc_dir}/syscall_musl.go"
+libc_want="20599ae6a0036b36e28b6794aa32321ffea6aa2fd88775d1b7d7ff32afd25b07"
+libc_got=$(sha256sum "${libc_sys}" | awk '{print $1}')
+if [[ "${libc_got}" != "${libc_want}" ]]; then
+	echo "modernc.org/libc syscall_musl.go changed. Update hack/android-libc/syscall_musl.go.overlay before binding." >&2
+	exit 1
+fi
+libc_backup="${wrap}/syscall_musl.go.orig"
+cp -a "${libc_sys}" "${libc_backup}"
+chmod u+w "${libc_sys}"
+cp -f "${root}/hack/android-libc/syscall_musl.go.overlay" "${libc_sys}"
+trap 'cp -a "${libc_backup}" "${libc_sys}"; rm -rf "${wrap}"; rm -f "${partial}"' EXIT
 
 gomobile init
 
